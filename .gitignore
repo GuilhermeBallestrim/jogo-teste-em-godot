@@ -1,0 +1,36 @@
+# ---------- Godot 4+ ----------
+# Cache de import e dados do editor (gerado, nunca versionar)
+.godot/
+/android/
+
+# Builds exportados
+/build/
+/export/
+*.exe
+*.pck
+*.zip
+*.dmg
+*.app
+*.apk
+*.aab
+*.ipa
+
+# Monolipadores C#
+.mono/
+data_*/
+mono_crash.*.json
+
+# ---------- Sistema operacional / editores ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+
+# ---------- Logs e temporários ----------
+*.log
+*.tmp
+*.bak
+*.old
