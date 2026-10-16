@@ -85,27 +85,64 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Instalar Godot e os templates de exportacao
+      # A action instala o binario E os templates no caminho que o proprio
+      # Godot espera. Fazer isso na mao erra o diretorio silenciosamente e a
+      # export so falha com "No export template found".
+      - name: Instalar Godot ${{ env.GODOT_VERSION }} com templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: true
+
+      - name: Conferir onde os templates foram instalados
         run: |
-          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-          unzip -q Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
-          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
-          chmod +x godot
-          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
-          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
-          unzip -q Godot_v${GODOT_VERSION}-stable_export_templates.tpz -d templates
-          mv templates/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+          set -euo pipefail
+          DIR="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          echo "Godot: $(command -v godot)"
+          echo "procurando templates em: $DIR"
+          if [ ! -d "$DIR" ]; then
+            echo "::error::diretorio de templates nao existe: $DIR"
+            find "$HOME/.local/share/godot" -maxdepth 3 -type d 2>/dev/null || true
+            exit 1
+          fi
+          ls -la "$DIR"
+          for f in linux_release.x86_64 linux_debug.x86_64 \
+                   windows_release_x86_64.exe windows_debug_x86_64.exe; do
+            if [ ! -f "$DIR/$f" ]; then
+              echo "::error::template ausente: $f"
+              exit 1
+            fi
+          done
+
+      - name: Conferir os presets declarados
+        run: |
+          set -euo pipefail
+          grep -E '^name=' export_presets.cfg || {
+            echo "::error::nenhum preset encontrado em export_presets.cfg"
+            exit 1
+          }
 
       - name: Importar
-        run: ./godot --headless --import
+        run: godot --headless --import
 
       - name: Exportar Linux
-        run: ./godot --headless --path . --export-release "Linux" build/linux/novo-jogo.x86_64
+        run: |
+          set -o pipefail
+          mkdir -p build/linux build/windows
+          godot --headless --path . --export-release "Linux" build/linux/novo-jogo.x86_64 2>&1 | tee export-linux.log
+          test -f build/linux/novo-jogo.x86_64
 
       - name: Exportar Windows
-        run: ./godot --headless --path . --export-release "Windows Desktop" build/windows/novo-jogo.exe
+        run: |
+          set -o pipefail
+          godot --headless --path . --export-release "Windows Desktop" build/windows/novo-jogo.exe 2>&1 | tee export-windows.log
+          test -f build/windows/novo-jogo.exe
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: builds
-          path: build/
+          path: |
+            build/
+            export-*.log
