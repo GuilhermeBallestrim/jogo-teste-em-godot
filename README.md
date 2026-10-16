@@ -24,13 +24,16 @@ Cena principal: `scenes/ui/main_menu.tscn`. Para pular direto para a fase:
 
 | Ação | Teclado | Gamepad |
 |---|---|---|
-| Mover | `WASD` / setas | analógico esquerdo |
-| Pular | `Espaço` | — |
+| Mover | `A` `D` + `W` `S` / setas | analógico esquerdo |
+| Pular | `Espaço` ou `W` | — |
 | Dash | `Shift` | — |
 | Atacar | botão esquerdo do mouse | — |
 | Interagir | `E` | — |
 | Pausar | `Esc` | — |
 | Reiniciar a fase | `R` | — |
+
+> `W` é só pulo. O movimento vertical fica nas setas ↑ ↓ e no analógico —
+> evita que andar para cima dispare pulo sem parar.
 
 ## Estrutura
 

@@ -102,7 +102,7 @@ theme_override_constants/margin_bottom = 16
 layout_mode = 2
 theme_override_colors/font_color = Color(0.45098, 0.4902, 0.56078, 1)
 theme_override_font_sizes/font_size = 14
-text = "WASD mover  -  Espaco pular  -  Shift dash  -  Clique atacar  -  Esc pausa"
+text = "A D + setas mover  -  ESPACO ou W pular  -  Shift dash  -  Clique atacar  -  Esc pausa"
 
 [node name="VersionLabel" type="Label" parent="Footer"]
 unique_name_in_owner = true
