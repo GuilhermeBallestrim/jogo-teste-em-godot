@@ -1,6 +1,6 @@
 extends Area2D
-## Zona de dano instantaneo: tira vida e devolve o jogador ao SpawnPoint.
-## Exportada como `damage` para permitir zonas "de aviso" com dano baixo.
+## Zona de dano: tira vida e devolve o jogador ao ultimo checkpoint ativado
+## (ou ao SpawnPoint da cena, se nenhum foi tocado).
 
 @export var damage: int = 25
 @export var respawn_delay := 0.25
@@ -13,13 +13,23 @@ func _on_body_entered(body: Node2D) -> void:
 		return
 
 	GameState.take_damage(damage)
+	Sfx.play(&"hurt", -6.0)
 
 	await get_tree().create_timer(respawn_delay).timeout
 	if not is_instance_valid(body) or not is_instance_valid(self):
 		return
 
-	var destination := _spawn_point.global_position if _spawn_point != null else global_position
 	if body.has_method(&"teleport_to"):
-		body.teleport_to(destination)
+		body.teleport_to(_respawn_position())
 	else:
-		body.global_position = destination
+		body.global_position = _respawn_position()
+
+
+## Prioridade: checkpoint salvo no GameState > SpawnPoint da cena > propria posicao.
+func _respawn_position() -> Vector2:
+	var stored: Variant = GameState.get_flag(Checkpoint.RESPAWN_FLAG)
+	if stored is Vector2:
+		return stored
+	if _spawn_point != null:
+		return _spawn_point.global_position
+	return global_position

@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.5.1"
+
+jobs:
+  test:
+    name: Testes e verificacoes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Godot ${{ env.GODOT_VERSION }}
+        run: |
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+          chmod +x godot
+
+      - name: Importar recursos
+        run: ./godot --headless --import
+
+      # Qualquer "SCRIPT ERROR" ou "Parse Error" no meio do output faz o
+      # grep inverter o status de saida e derrubar o job.
+      - name: Verificar o projeto
+        run: |
+          set -o pipefail
+          ./godot --headless --editor --quit 2>&1 \
+            | tee import.log \
+            | { grep -E "SCRIPT ERROR|Parse Error|Compile Error" && exit 1 || true; }
+
+      - name: Testes unitarios e de integracao
+        run: |
+          set -o pipefail
+          ./godot --headless --path . --script res://tests/test_runner.gd 2>&1 | tee tests.log
+          grep -q "TESTES: PASSARAM" tests.log
+
+      - name: Rodar o jogo por 5 segundos
+        # Falha so em erro de verdade. Warnings do renderizador/headless variam
+        # entre plataformas e nao devem derrubar o build.
+        run: |
+          set -o pipefail
+          ./godot --headless --path . --quit-after 300 2>&1 | tee run.log
+          if grep -qE "SCRIPT ERROR|Parse Error|Compile Error|^ERROR:" run.log; then
+            echo "::error::O jogo emunciou erros em runtime"
+            exit 1
+          fi
+
+      - name: Conferir que o input map sobreviveu ao salvamento do editor
+        # O editor reescreve project.godot ao salvar. Se o [input] sumir ou ficar
+        # vazio, e porque algo sobrescreveu as acoes.
+        run: |
+          set -o pipefail
+          ./godot --headless --path . --editor --quit
+          ./godot --headless --path . --script res://tools/dump_inputmap.gd > inputmap.log
+          for action in move_left move_right move_up move_down jump dash interact attack pause restart; do
+            grep -q "acao: $action" inputmap.log || {
+              echo "::error::Acao ausente no Input Map apos o editor salvar: $action"
+              exit 1
+            }
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs
+          path: |
+            *.log
+
+  export:
+    name: Exportar Windows e Linux
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Godot e os templates de exportacao
+        run: |
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+          chmod +x godot
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          unzip -q Godot_v${GODOT_VERSION}-stable_export_templates.tpz -d templates
+          mv templates/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+
+      - name: Importar
+        run: ./godot --headless --import
+
+      - name: Exportar Linux
+        run: ./godot --headless --path . --export-release "Linux" build/linux/novo-jogo.x86_64
+
+      - name: Exportar Windows
+        run: ./godot --headless --path . --export-release "Windows Desktop" build/windows/novo-jogo.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: builds
+          path: build/

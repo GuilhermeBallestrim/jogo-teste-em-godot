@@ -1,11 +1,24 @@
 # novo jogo
 
-Jogo feito em **Godot 4.5** (GDScript, renderer *GL Compatibility*).
+Plataforma 2D em **Godot 4.5** (GDScript, renderer *GL Compatibility*).
+Protótipo completo: menu, pausa, opções, combate, inimigos com IA,
+checkpoints, coletáveis, save/load e áudio sintetizado.
 
 ## Como rodar
 
-Abra a pasta raiz no Godot 4.5 e rode (`F5`). A cena principal é
-`scenes/main/main.tscn`, que instancia o nível de protótipo.
+**Pelo editor** — abra `project.godot` no Godot 4.5 e aperte `F5`.
+
+**Pela linha de comando**
+
+```powershell
+& "C:\Users\Guilherme\Desktop\Godot_v4.5.1.exe" --path "D:\repositorios godot\novo-jogo"
+```
+
+Cena principal: `scenes/ui/main_menu.tscn`. Para pular direto para a fase:
+
+```powershell
+& "C:\Users\Guilherme\Desktop\Godot_v4.5.1.exe" --path "D:\repositorios godot\novo-jogo" "res://scenes/levels/level_01.tscn"
+```
 
 ## Controles
 
@@ -14,69 +27,79 @@ Abra a pasta raiz no Godot 4.5 e rode (`F5`). A cena principal é
 | Mover | `WASD` / setas | analógico esquerdo |
 | Pular | `Espaço` | — |
 | Dash | `Shift` | — |
-| Interagir | `E` | — |
 | Atacar | botão esquerdo do mouse | — |
+| Interagir | `E` | — |
 | Pausar | `Esc` | — |
-| Reiniciar | `R` | — |
+| Reiniciar a fase | `R` | — |
 
-## Autoloads
-
-| Nome | Arquivo | Responsabilidade |
-|---|---|---|
-| `GameState` | `autoload/game_state.gd` | vida, moedas, pontos e flags da sessão, via sinais |
-| `Save` | `autoload/save_manager.gd` | persistência em `user://saves/<slot>.json` com versão |
-| `Audio` | `autoload/audio_manager.gd` | música com crossfade e pool de 8 vozes de SFX |
-| `SceneRouter` | `autoload/scene_router.gd` | troca de cena com fade |
-
-## Validação
-
-Smoke test (não precisa abrir o editor, sai com código != 0 em caso de falha):
-
-```powershell
-godot --headless --path . --script res://tools/smoke_test.gd
-```
-
-Ele confere o Input Map, os autoloads, o carregamento da cena principal, o
-ciclo de sinais do `GameState` e um ida-e-volta de save.
-
-## Estrutura de pastas
+## Estrutura
 
 ```
 novo-jogo/
-├── assets/              # assets globais compartilhados
-│   ├── audio/music/     # músicas de fundo
-│   ├── audio/sfx/       # efeitos sonoros
-│   ├── fonts/           # fontes (.ttf/.otf)
-│   ├── sprites/         # sprites e texturas 2D
-│   └── ui/              # imagens, ícones e temas da interface
-├── autoload/            # singletons (GameState, Audio, SceneRouter, Save)
-├── resources/           # Resources customizados (.tres): itens, quests, config
-├── src/                 # código de sistemas reutilizáveis, sem vínculo com cena
+├── assets/              # audio, fontes, sprites (vazio por enquanto)
+├── autoload/            # GameState, Save, Settings, Audio, SceneRouter
+├── resources/           # ui_theme.tres
+├── src/                 # codigo reutilizavel, sem dependencia de cena
+│   ├── audio/           # Sfx e Music (sintetizam AudioStreamWAV)
+│   ├── camera/          # camera_shake.gd
+│   ├── combat/          # Hitbox, Hurtbox
+│   └── core/            # Layers
 ├── scenes/
-│   ├── main/            # cena principal e menus de topo
-│   ├── actors/          # player, inimigos, NPCs (cena + script no mesmo lugar)
-│   ├── levels/          # fases
-│   ├── props/           # objetos de cenário reutilizáveis
-│   └── ui/              # HUD, menus e pop-ups reutilizáveis
-├── tests/               # testes automatizados (GUT)
-├── tools/               # scripts de editor e de build
-├── docs/                # documentação e notas de design
-└── addons/              # plugins do Godot
+│   ├── actors/
+│   │   ├── player/      # player.gd + player.tscn
+│   │   └── enemies/     # enemy.gd (FSM), slime.gd + slime.tscn
+│   ├── levels/          # level_01.gd + level_01.tscn
+│   ├── props/           # platform, coin, checkpoint, kill_zone
+│   └── ui/              # main_menu, hud, pause_menu, options_panel, end_screen
+├── tests/               # test_runner.gd
+├── tools/               # dump_inputmap.gd (diagnostico)
+├── docs/                # architecture.md, design.md
+└── .github/workflows/   # ci.yml
 ```
 
-**Convenção:** cenas e scripts ficam **co-localizados por feature** dentro de
-`scenes/`. Só vai para `src/` o código genérico que não pertence a nenhuma cena.
+Detalhes em [`docs/architecture.md`](docs/architecture.md) e
+[`docs/design.md`](docs/design.md).
+
+## Validação
+
+```powershell
+$godot = "C:\Users\Guilherme\Desktop\Godot_v4.5.1.exe"
+
+# 116 verificacoes: Layers, InputMap, GameState, Save, audio e as 11 cenas
+& $godot --headless --path . --script res://tests/test_runner.gd
+
+# rodar o jogo 5 segundos sem erros nem avisos
+& $godot --headless --path . --quit-after 300
+
+# ver como o Input Map foi interpretado
+& $godot --headless --path . --script res://tools/dump_inputmap.gd
+```
+
+Todos saem com código 0 quando está tudo certo — é o que o CI usa.
+
+## Autoloads
+
+| Nome | Responsabilidade |
+|---|---|
+| `GameState` | vida, moedas, pontos e flags, propagados por sinais |
+| `Save` | JSON versionado em `user://saves/<slot>.json` |
+| `Settings` | volume e tela cheia em `user://settings.cfg` |
+| `Audio` | toca; cria os buses `Music` e `SFX` em runtime |
+| `SceneRouter` | troca de cena com fade |
 
 ## Convenções
 
-- **Input** — sempre via `Input.get_vector(&"move_left", &"move_right", ...)`
-  usando as ações do Input Map; nunca ler teclas direto.
+- **Input** — só pelo Input Map (`Input.get_vector(&"move_left", ...)`),
+  nunca teclas cruas.
 - **Camadas de física 2D** — `World`, `Player`, `Enemy`, `Interactable`,
-  `Hitbox`, `Hurtbox`.
+  `Hitbox`, `Hurtbox`. As constantes ficam em `src/core/layers.gd` e um teste
+  falha se elas saírem de sincronia com o `project.godot`.
+- **Dano** — quem *recebe* decide. A `Hitbox` só existe; a `Hurtbox` monitora e
+  chama `apply_damage()` no dono.
 - **GDScript** — nunca combine tipo explícito com `:=` (`var x: int := 5` é
-  erro de parse); use `=` com tipo declarado ou `:=` sem tipo.
-- **Nomes** — `snake_case` para arquivos e variáveis, `PascalCase` para classes
-  e nós de cena (`Player`, `EnemySlime`).
+  erro de parse; use `=` com tipo declarado ou `:=` sem tipo).
+- **Nomes** — `snake_case` em arquivos e variáveis, `PascalCase` em classes e
+  nós de cena.
 - **Commit** — um commit por mudança coesa.
 
 ## Git

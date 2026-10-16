@@ -1,0 +1,90 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/ui/options_panel.gd" id="1_options"]
+
+[node name="OptionsPanel" type="CanvasLayer"]
+script = ExtResource("1_options")
+
+[node name="Dim" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0392, 0.047, 0.0666, 0.82)
+
+[node name="Center" type="CenterContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="Center"]
+custom_minimum_size = Vector2(460, 0)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="Center/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="Column" type="VBoxContainer" parent="Center/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="Center/Panel/Margin/Column"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Opcoes"
+horizontal_alignment = 1
+
+[node name="MusicRow" type="HBoxContainer" parent="Center/Panel/Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Center/Panel/Margin/Column/MusicRow"]
+custom_minimum_size = Vector2(96, 0)
+layout_mode = 2
+text = "Musica"
+
+[node name="MusicSlider" type="HSlider" parent="Center/Panel/Margin/Column/MusicRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+value = 70.0
+
+[node name="SfxRow" type="HBoxContainer" parent="Center/Panel/Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Center/Panel/Margin/Column/SfxRow"]
+custom_minimum_size = Vector2(96, 0)
+layout_mode = 2
+text = "Efeitos"
+
+[node name="SfxSlider" type="HSlider" parent="Center/Panel/Margin/Column/SfxRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+value = 90.0
+
+[node name="FullscreenCheck" type="CheckButton" parent="Center/Panel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Tela cheia"
+
+[node name="Spacer" type="Control" parent="Center/Panel/Margin/Column"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="CloseButton" type="Button" parent="Center/Panel/Margin/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+text = "Voltar"

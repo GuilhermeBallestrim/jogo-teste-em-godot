@@ -1,0 +1,171 @@
+[gd_scene load_steps=10 format=3 uid="uid://dqw3x7nk2mf1a"]
+
+[ext_resource type="Script" path="res://scenes/levels/level_01.gd" id="1_level"]
+[ext_resource type="PackedScene" path="res://scenes/props/platform.tscn" id="2_platform"]
+[ext_resource type="Script" path="res://scenes/props/kill_zone.gd" id="3_killzone"]
+[ext_resource type="PackedScene" path="res://scenes/props/coin.tscn" id="4_coin"]
+[ext_resource type="PackedScene" path="res://scenes/props/checkpoint.tscn" id="5_checkpoint"]
+[ext_resource type="PackedScene" path="res://scenes/actors/enemies/slime.tscn" id="6_slime"]
+[ext_resource type="PackedScene" path="res://scenes/actors/player/player.tscn" id="7_player"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="8_hud"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_kill"]
+size = Vector2(2800, 60)
+
+[node name="Level01" type="Node2D"]
+script = ExtResource("1_level")
+coins_to_win = 12
+camera_limits = Rect2(-1240, -780, 2480, 1200)
+
+[node name="Background" type="CanvasLayer" parent="."]
+layer = -10
+
+[node name="Sky" type="ColorRect" parent="Background"]
+offset_right = 1280.0
+offset_bottom = 720.0
+mouse_filter = 2
+color = Color(0.0705, 0.0823, 0.1176, 1)
+
+[node name="Decor" type="Node2D" parent="."]
+z_index = -5
+
+[node name="MountainsFar" type="Polygon2D" parent="Decor"]
+polygon = PackedVector2Array(-1500, 400, -1500, -60, -1000, -270, -700, -120, -500, -310, -250, -90, 0, -230, 300, -60, 600, -250, 900, -110, 1200, -290, 1500, -140, 1500, 400)
+color = Color(0.11372, 0.14509, 0.20392, 1)
+
+[node name="MountainsNear" type="Polygon2D" parent="Decor"]
+polygon = PackedVector2Array(-1500, 400, -1500, 70, -900, -40, -600, 50, -250, -90, 100, 40, 450, -70, 800, 30, 1150, -80, 1500, 20, 1500, 400)
+color = Color(0.07843, 0.10196, 0.14509, 1)
+
+[node name="SpawnPoint" type="Marker2D" parent="."]
+position = Vector2(-1080, -60)
+
+[node name="Platforms" type="Node2D" parent="."]
+
+[node name="Ground1" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(-980, 40)
+size = Vector2(440, 80)
+
+[node name="Ground2" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(-430, 40)
+size = Vector2(340, 80)
+
+[node name="Ground3" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(150, 40)
+size = Vector2(420, 80)
+
+[node name="Ground4" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(880, 40)
+size = Vector2(640, 80)
+
+[node name="Float1" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(-680, -200)
+size = Vector2(180, 24)
+body_color = Color(0.23921, 0.29803, 0.38431, 1)
+top_color = Color(0.976, 0.776, 0.251, 1)
+
+[node name="Float2" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(-160, -330)
+size = Vector2(180, 24)
+body_color = Color(0.23921, 0.29803, 0.38431, 1)
+top_color = Color(0.976, 0.776, 0.251, 1)
+
+[node name="Float3" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(460, -210)
+size = Vector2(180, 24)
+body_color = Color(0.23921, 0.29803, 0.38431, 1)
+top_color = Color(0.976, 0.776, 0.251, 1)
+
+[node name="Float4" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(870, -390)
+size = Vector2(220, 24)
+body_color = Color(0.23921, 0.29803, 0.38431, 1)
+top_color = Color(0.976, 0.776, 0.251, 1)
+
+[node name="KillZone" type="Area2D" parent="."]
+position = Vector2(0, 110)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("3_killzone")
+
+[node name="Visual" type="Polygon2D" parent="KillZone"]
+polygon = PackedVector2Array(-1400, -30, 1400, -30, 1400, 30, -1400, 30)
+color = Color(0.85098, 0.23529, 0.29019, 0.16)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="KillZone"]
+shape = SubResource("RectangleShape2D_kill")
+
+[node name="Coins" type="Node2D" parent="."]
+
+[node name="Coin1" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(-1160, -50)
+
+[node name="Coin2" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(-980, -50)
+
+[node name="Coin3" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(-680, -260)
+
+[node name="Coin4" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(-480, -50)
+
+[node name="Coin5" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(-300, -50)
+
+[node name="Coin6" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(-160, -390)
+
+[node name="Coin7" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(0, -50)
+
+[node name="Coin8" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(150, -50)
+
+[node name="Coin9" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(300, -50)
+
+[node name="Coin10" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(460, -260)
+
+[node name="Coin11" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(870, -450)
+
+[node name="Coin12" parent="Coins" instance=ExtResource("4_coin")]
+position = Vector2(1000, -50)
+
+[node name="Checkpoints" type="Node2D" parent="."]
+
+[node name="CheckpointA" parent="Checkpoints" instance=ExtResource("5_checkpoint")]
+position = Vector2(-980, 0)
+
+[node name="CheckpointB" parent="Checkpoints" instance=ExtResource("5_checkpoint")]
+position = Vector2(880, 0)
+
+[node name="Enemies" type="Node2D" parent="."]
+
+[node name="Slime1" parent="Enemies" instance=ExtResource("6_slime")]
+position = Vector2(-900, -16)
+patrol_left = -140.0
+patrol_right = 140.0
+
+[node name="Slime2" parent="Enemies" instance=ExtResource("6_slime")]
+position = Vector2(-430, -16)
+patrol_left = -120.0
+patrol_right = 120.0
+
+[node name="Slime3" parent="Enemies" instance=ExtResource("6_slime")]
+position = Vector2(150, -16)
+patrol_left = -150.0
+patrol_right = 150.0
+
+[node name="Slime4" parent="Enemies" instance=ExtResource("6_slime")]
+position = Vector2(880, -16)
+patrol_left = -240.0
+patrol_right = 240.0
+
+[node name="Player" parent="." instance=ExtResource("7_player")]
+position = Vector2(-1080, -60)
+
+[node name="HUD" parent="." instance=ExtResource("8_hud")]
+
+[connection signal="body_entered" from="KillZone" to="KillZone" method="_on_body_entered"]

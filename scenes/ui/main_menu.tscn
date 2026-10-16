@@ -1,0 +1,113 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/ui/main_menu.gd" id="1_menu"]
+
+[node name="MainMenu" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="Background" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.0627, 0.0745, 0.1098, 1)
+
+[node name="GlowTop" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-700, -80, 700, -180, 700, 40, -700, 140)
+color = Color(0.13725, 0.2, 0.32549, 0.35)
+
+[node name="GlowBottom" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-700, 560, 700, 460, 700, 700, -700, 700)
+color = Color(0.13725, 0.2, 0.32549, 0.28)
+
+[node name="Center" type="CenterContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Column" type="VBoxContainer" parent="Center"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Center/Column"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 56
+text = "NOVO JOGO"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Center/Column"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56078, 0.63137, 0.73725, 1)
+theme_override_font_sizes/font_size = 16
+text = "prototipo de plataforma"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="Center/Column"]
+custom_minimum_size = Vector2(0, 26)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PlayButton" type="Button" parent="Center/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(260, 0)
+layout_mode = 2
+text = "Jogar"
+
+[node name="ContinueButton" type="Button" parent="Center/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(260, 0)
+layout_mode = 2
+text = "Continuar"
+
+[node name="OptionsButton" type="Button" parent="Center/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(260, 0)
+layout_mode = 2
+text = "Opcoes"
+
+[node name="QuitButton" type="Button" parent="Center/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(260, 0)
+layout_mode = 2
+text = "Sair"
+
+[node name="SaveHintLabel" type="Label" parent="Center/Column"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.50588, 0.72549, 0.94902, 1)
+theme_override_font_sizes/font_size = 14
+text = "Progresso salvo encontrado"
+horizontal_alignment = 1
+
+[node name="Footer" type="MarginContainer" parent="."]
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -60.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 16
+
+[node name="Controls" type="Label" parent="Footer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45098, 0.4902, 0.56078, 1)
+theme_override_font_sizes/font_size = 14
+text = "WASD mover  -  Espaco pular  -  Shift dash  -  Clique atacar  -  Esc pausa"
+
+[node name="VersionLabel" type="Label" parent="Footer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45098, 0.4902, 0.56078, 1)
+theme_override_font_sizes/font_size = 14
+text = "Godot"
+horizontal_alignment = 2

@@ -1,0 +1,66 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scenes/actors/enemies/slime.gd" id="1_slime"]
+[ext_resource type="Script" path="res://src/combat/hurtbox.gd" id="2_hurtbox"]
+[ext_resource type="Script" path="res://src/combat/hitbox.gd" id="3_hitbox"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(34, 26)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hurt"]
+radius = 19.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hit"]
+radius = 20.0
+
+[node name="Slime" type="CharacterBody2D" groups=["enemies"]]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1_slime")
+body_size = Vector2(34, 26)
+body_color = Color(0.855, 0.361, 0.451, 1)
+patrol_left = -110.0
+patrol_right = 110.0
+detect_range = 300.0
+forget_range = 440.0
+attack_range = 58.0
+max_health = 3
+contact_damage = 1
+
+[node name="Sprite" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-17, -13, 17, -13, 17, 13, -17, 13)
+color = Color(0.855, 0.361, 0.451, 1)
+
+[node name="EyeLeft" type="Polygon2D" parent="Sprite"]
+position = Vector2(-6, -3)
+polygon = PackedVector2Array(-3, -4, 3, -4, 3, 2, -3, 2)
+color = Color(0.078, 0.086, 0.125, 1)
+
+[node name="EyeRight" type="Polygon2D" parent="Sprite"]
+position = Vector2(6, -3)
+polygon = PackedVector2Array(-3, -4, 3, -4, 3, 2, -3, 2)
+color = Color(0.078, 0.086, 0.125, 1)
+
+[node name="HealthBar" type="ColorRect" parent="."]
+visible = false
+offset_left = -18.0
+offset_top = -24.0
+offset_right = 18.0
+offset_bottom = -20.0
+color = Color(0.949, 0.31, 0.361, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Hurtbox" type="Area2D" parent="."]
+script = ExtResource("2_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("CircleShape2D_hurt")
+
+[node name="Hitbox" type="Area2D" parent="."]
+position = Vector2(26, 0)
+script = ExtResource("3_hitbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
+shape = SubResource("CircleShape2D_hit")
