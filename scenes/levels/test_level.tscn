@@ -1,0 +1,117 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/actors/player/player.tscn" id="1_player"]
+[ext_resource type="Script" path="res://scenes/props/kill_zone.gd" id="2_kill_zone"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="3_hud"]
+
+[sub_resource type="RectangleShape2D" id="Rect_GroundLeft"]
+size = Vector2(680, 80)
+
+[sub_resource type="RectangleShape2D" id="Rect_GroundRight"]
+size = Vector2(680, 80)
+
+[sub_resource type="RectangleShape2D" id="Rect_Bridge"]
+size = Vector2(140, 24)
+
+[sub_resource type="RectangleShape2D" id="Rect_PlatformA"]
+size = Vector2(220, 24)
+
+[sub_resource type="RectangleShape2D" id="Rect_PlatformB"]
+size = Vector2(200, 24)
+
+[sub_resource type="RectangleShape2D" id="Rect_KillZone"]
+size = Vector2(240, 40)
+
+[node name="TestLevel" type="Node2D"]
+
+[node name="Background" type="CanvasLayer" parent="."]
+layer = -1
+
+[node name="Sky" type="ColorRect" parent="Background"]
+offset_right = 1280.0
+offset_bottom = 720.0
+mouse_filter = 2
+color = Color(0.098, 0.106, 0.156, 1)
+
+[node name="SpawnPoint" type="Marker2D" parent="."]
+position = Vector2(-460, -60)
+
+[node name="GroundLeft" type="StaticBody2D" parent="."]
+position = Vector2(-460, 40)
+collision_layer = 1
+collision_mask = 0
+
+[node name="Visual" type="Polygon2D" parent="GroundLeft"]
+polygon = PackedVector2Array(-340, -40, 340, -40, 340, 40, -340, 40)
+color = Color(0.196, 0.239, 0.294, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="GroundLeft"]
+shape = SubResource("Rect_GroundLeft")
+
+[node name="GroundRight" type="StaticBody2D" parent="."]
+position = Vector2(460, 40)
+collision_layer = 1
+collision_mask = 0
+
+[node name="Visual" type="Polygon2D" parent="GroundRight"]
+polygon = PackedVector2Array(-340, -40, 340, -40, 340, 40, -340, 40)
+color = Color(0.196, 0.239, 0.294, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="GroundRight"]
+shape = SubResource("Rect_GroundRight")
+
+[node name="Bridge" type="StaticBody2D" parent="."]
+position = Vector2(0, -160)
+collision_layer = 1
+collision_mask = 0
+
+[node name="Visual" type="Polygon2D" parent="Bridge"]
+polygon = PackedVector2Array(-70, -12, 70, -12, 70, 12, -70, 12)
+color = Color(0.914, 0.706, 0.298, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bridge"]
+shape = SubResource("Rect_Bridge")
+
+[node name="PlatformA" type="StaticBody2D" parent="."]
+position = Vector2(-420, -180)
+collision_layer = 1
+collision_mask = 0
+
+[node name="Visual" type="Polygon2D" parent="PlatformA"]
+polygon = PackedVector2Array(-110, -12, 110, -12, 110, 12, -110, 12)
+color = Color(0.294, 0.396, 0.51, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PlatformA"]
+shape = SubResource("Rect_PlatformA")
+
+[node name="PlatformB" type="StaticBody2D" parent="."]
+position = Vector2(420, -320)
+collision_layer = 1
+collision_mask = 0
+
+[node name="Visual" type="Polygon2D" parent="PlatformB"]
+polygon = PackedVector2Array(-100, -12, 100, -12, 100, 12, -100, 12)
+color = Color(0.294, 0.396, 0.51, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PlatformB"]
+shape = SubResource("Rect_PlatformB")
+
+[node name="KillZone" type="Area2D" parent="."]
+position = Vector2(0, 60)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("2_kill_zone")
+
+[node name="Visual" type="Polygon2D" parent="KillZone"]
+polygon = PackedVector2Array(-120, -20, 120, -20, 120, 20, -120, 20)
+color = Color(0.851, 0.235, 0.29, 0.35)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="KillZone"]
+shape = SubResource("Rect_KillZone")
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+position = Vector2(-460, -60)
+
+[node name="HUD" parent="." instance=ExtResource("3_hud")]
+
+[connection signal="body_entered" from="KillZone" to="KillZone" method="_on_body_entered"]

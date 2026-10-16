@@ -5,7 +5,39 @@ Jogo feito em **Godot 4.5** (GDScript, renderer *GL Compatibility*).
 ## Como rodar
 
 Abra a pasta raiz no Godot 4.5 e rode (`F5`). A cena principal é
-`scenes/main/main.tscn`.
+`scenes/main/main.tscn`, que instancia o nível de protótipo.
+
+## Controles
+
+| Ação | Teclado | Gamepad |
+|---|---|---|
+| Mover | `WASD` / setas | analógico esquerdo |
+| Pular | `Espaço` | — |
+| Dash | `Shift` | — |
+| Interagir | `E` | — |
+| Atacar | botão esquerdo do mouse | — |
+| Pausar | `Esc` | — |
+| Reiniciar | `R` | — |
+
+## Autoloads
+
+| Nome | Arquivo | Responsabilidade |
+|---|---|---|
+| `GameState` | `autoload/game_state.gd` | vida, moedas, pontos e flags da sessão, via sinais |
+| `Save` | `autoload/save_manager.gd` | persistência em `user://saves/<slot>.json` com versão |
+| `Audio` | `autoload/audio_manager.gd` | música com crossfade e pool de 8 vozes de SFX |
+| `SceneRouter` | `autoload/scene_router.gd` | troca de cena com fade |
+
+## Validação
+
+Smoke test (não precisa abrir o editor, sai com código != 0 em caso de falha):
+
+```powershell
+godot --headless --path . --script res://tools/smoke_test.gd
+```
+
+Ele confere o Input Map, os autoloads, o carregamento da cena principal, o
+ciclo de sinais do `GameState` e um ida-e-volta de save.
 
 ## Estrutura de pastas
 
@@ -41,6 +73,8 @@ novo-jogo/
   usando as ações do Input Map; nunca ler teclas direto.
 - **Camadas de física 2D** — `World`, `Player`, `Enemy`, `Interactable`,
   `Hitbox`, `Hurtbox`.
+- **GDScript** — nunca combine tipo explícito com `:=` (`var x: int := 5` é
+  erro de parse); use `=` com tipo declarado ou `:=` sem tipo.
 - **Nomes** — `snake_case` para arquivos e variáveis, `PascalCase` para classes
   e nós de cena (`Player`, `EnemySlime`).
 - **Commit** — um commit por mudança coesa.

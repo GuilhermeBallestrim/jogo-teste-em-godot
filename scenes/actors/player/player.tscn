@@ -1,0 +1,35 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/actors/player/player.gd" id="1_player"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_body"]
+radius = 16.0
+height = 56.0
+
+[node name="Player" type="CharacterBody2D" groups=["player"]]
+z_index = 10
+collision_layer = 2
+collision_mask = 1
+floor_snap_length = 8.0
+script = ExtResource("1_player")
+
+[node name="Sprite" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-16, -28, 16, -28, 16, 28, -16, 28)
+color = Color(0.29, 0.62, 0.96, 1)
+
+[node name="Visor" type="Polygon2D" parent="Sprite"]
+position = Vector2(6, -14)
+polygon = PackedVector2Array(-5, -5, 5, -5, 5, 5, -5, 5)
+color = Color(0.06, 0.07, 0.11, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CapsuleShape2D_body")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position_smoothing_enabled = true
+position_smoothing_speed = 10.0
+limit_left = -800
+limit_top = -560
+limit_right = 800
+limit_bottom = 200
+limit_smoothed = true

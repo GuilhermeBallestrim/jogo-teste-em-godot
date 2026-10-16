@@ -18,7 +18,10 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-; Singletons entram aqui (ex.: GameState="*res://autoload/game_state.gd")
+GameState="*res://autoload/game_state.gd"
+Save="*res://autoload/save_manager.gd"
+Audio="*res://autoload/audio_manager.gd"
+SceneRouter="*res://autoload/scene_router.gd"
 
 [display]
 
