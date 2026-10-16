@@ -15,6 +15,8 @@ const END_SCREEN_SCENE := "res://scenes/ui/end_screen.tscn"
 @onready var _hud: HUD = $HUD
 @onready var _camera: Camera2D = $Player/Camera2D
 
+const SAVE_SLOT := &"main"
+
 var _finished := false
 var _pause_menu: PauseMenu = null
 var _end_screen: EndScreen = null
@@ -96,6 +98,42 @@ func _open_pause_menu() -> void:
 	_pause_menu.resume_requested.connect(_resume)
 	_pause_menu.restart_requested.connect(_restart)
 	_pause_menu.menu_requested.connect(_go_to_menu)
+	_pause_menu.save_completed.connect(_on_save_completed)
+
+
+func _on_save_completed(ok: bool) -> void:
+	if ok:
+		_flash_banner("Progresso salvo", Color(0.376, 0.878, 0.612))
+		Sfx.play(&"checkpoint", -6.0)
+	else:
+		_flash_banner("Falha ao salvar", Color(0.949, 0.361, 0.361))
+		Sfx.play(&"back", -4.0)
+
+
+## Aviso curto no centro da tela, sem interromper o jogo.
+func _flash_banner(text: String, color: Color) -> void:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 30)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	label.add_theme_constant_override("outline_size", 6)
+
+	var layer := CanvasLayer.new()
+	layer.layer = 50
+	layer.add_child(label)
+	add_child(layer)
+
+	await get_tree().process_frame
+	var view := get_viewport().get_visible_rect().size
+	label.size = Vector2(view.x, 60)
+	label.position = Vector2(0, view.y * 0.3)
+
+	var tween := create_tween()
+	tween.tween_interval(1.2)
+	tween.tween_property(label, "modulate:a", 0.0, 0.5)
+	tween.tween_callback(layer.queue_free)
 
 
 func _resume() -> void:

@@ -6,12 +6,17 @@ signal resume_requested
 signal restart_requested
 signal options_requested
 signal menu_requested
+## Emitido depois que o progresso foi gravado com sucesso.
+signal save_completed(ok: bool)
 
 const OPTIONS_SCENE := "res://scenes/ui/options_panel.tscn"
+## Mesmo slot que o menu principal le no botao "Continuar".
+const SLOT := &"main"
 
 @onready var _resume: Button = %ResumeButton
 @onready var _restart: Button = %RestartButton
 @onready var _options: Button = %OptionsButton
+@onready var _save: Button = %SaveButton
 @onready var _menu: Button = %MenuButton
 
 var _options_panel: OptionsPanel = null
@@ -25,9 +30,15 @@ func _ready() -> void:
 	_resume.pressed.connect(func() -> void: _emit_and_play(resume_requested))
 	_restart.pressed.connect(func() -> void: _emit_and_play(restart_requested))
 	_options.pressed.connect(_on_options)
+	_save.pressed.connect(_on_save)
 	_menu.pressed.connect(func() -> void: _emit_and_play(menu_requested))
 
 	_resume.grab_focus()
+
+
+func _on_save() -> void:
+	Sfx.play(&"select")
+	save_completed.emit(Save.save_game(SLOT))
 
 
 func _emit_and_play(target: Signal) -> void:

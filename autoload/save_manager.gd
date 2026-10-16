@@ -11,6 +11,9 @@ const SAVE_DIR := "user://saves"
 const SAVE_VERSION := 1
 const DEFAULT_SLOT := &"main"
 
+## Preenchido por [method load_game] com o path da cena salvo.
+var _last_scene_path: String = ""
+
 
 func _ready() -> void:
 	if not DirAccess.dir_exists_absolute(SAVE_DIR):
@@ -19,10 +22,13 @@ func _ready() -> void:
 
 func save_game(slot: StringName = DEFAULT_SLOT) -> bool:
 	var path := _path_for(slot)
+	var current := get_tree().current_scene
 	var payload := {
 		"version": SAVE_VERSION,
 		"timestamp": Time.get_unix_time_from_system(),
-		"scene_path": get_tree().current_scene.scene_file_path if get_tree().current_scene else "",
+		# Guardamos o path e o id para o menu saber o que retomar.
+		"scene_path": current.scene_file_path if current != null else "",
+		"scene_id": String(SceneRouter.current_scene_id),
 		"game_state": GameState.to_dict(),
 	}
 
@@ -66,6 +72,12 @@ func load_game(slot: StringName = DEFAULT_SLOT) -> bool:
 		return false
 
 	GameState.from_dict(data.get("game_state", {}))
+
+	# Se a cena salva nao existir mais (fase removida, save antigo), limpa o
+	# caminho para o menu cair no padrao em vez de tentar abrir arquivo morto.
+	var scene_path := String(data.get("scene_path", ""))
+	_last_scene_path = scene_path if ResourceLoader.exists(scene_path) else ""
+
 	save_loaded.emit(slot)
 	return true
 
@@ -82,6 +94,11 @@ func erase_save(slot: StringName = DEFAULT_SLOT) -> bool:
 		return false
 	save_erased.emit(slot)
 	return true
+
+
+## Caminho da cena do ultimo save carregado. Vazio se ainda nao houve leitura.
+func last_scene_path() -> String:
+	return _last_scene_path
 
 
 func list_slots() -> PackedStringArray:

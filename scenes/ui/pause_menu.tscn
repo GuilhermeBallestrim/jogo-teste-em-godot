@@ -62,6 +62,12 @@ custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Opcoes"
 
+[node name="SaveButton" type="Button" parent="Center/Panel/Margin/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+text = "Salvar progresso"
+
 [node name="MenuButton" type="Button" parent="Center/Panel/Margin/Column"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 40)

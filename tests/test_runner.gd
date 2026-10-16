@@ -197,6 +197,7 @@ func _test_save() -> void:
 	var slot := &"__test_runner__"
 	_save.erase_save(slot)
 	_check(not _save.has_save(slot), "slot inicial nao existe")
+	_check_eq(_save.last_scene_path(), "", "last_scene_path vazio antes de carregar")
 
 	_gs.coins = 77
 	_gs.score = 1234
@@ -207,6 +208,14 @@ func _test_save() -> void:
 	_check(_save.load_game(slot), "load_game retornou true")
 	_check_eq(_gs.coins, 77, "moedas restauradas do disco")
 	_check_eq(_gs.score, 1234, "pontos restaurados do disco")
+
+	# O test runner roda sem cena carregada (--script nao instancia a main),
+	# entao scene_path sai vazio e last_scene_path deve ficar vazio tambem.
+	# O que importa e que ele NUNCA aponte para um arquivo inexistente.
+	_check(
+		_save.last_scene_path() == "" or ResourceLoader.exists(_save.last_scene_path()),
+		"last_scene_path nunca aponta para cena inexistente"
+	)
 
 	_check(_save.erase_save(slot), "erase_save retornou true")
 	_check(not _save.has_save(slot), "arquivo removido")

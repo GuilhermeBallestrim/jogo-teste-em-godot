@@ -47,7 +47,8 @@ func _on_continue() -> void:
 	if not Save.load_game():
 		_refresh_save_state()
 		return
-	SceneRouter.goto(LEVEL_SCENE, &"level_01")
+	# Retoma a cena que estava em jogo; cai na fase 1 se o save for antigo.
+	SceneRouter.goto(Save.last_scene_path(), &"level_01")
 
 
 func _on_options() -> void:
