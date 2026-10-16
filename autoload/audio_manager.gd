@@ -193,16 +193,25 @@ func stop_all_sfx() -> void:
 		player.stop()
 
 
-## Encerra tudo e descarta os AudioStreamWAV sintetizados. Sem isso o Godot
-## acusa "ObjectDB instances leaked at exit" ao fechar o jogo.
+## Encerra tudo e descarta os AudioStreamWAV sintetizados.
+##
+## So para o player nao basta: `stop()` mantem a referencia em `stream`, e sem
+## isso o Godot acusa "ObjectDB instances leaked at exit" ao fechar o jogo --
+## o `AudioStreamWAV` continua retido pelo AudioStreamPlayer.
 func _exit_tree() -> void:
 	_kill_fade()
-	_stop_all_music()
-	stop_all_sfx()
+	_detach(_music_players)
+	_detach(_sfx_pool)
 	Sfx.clear_cache()
 	Music.clear_cache()
 	if instance == self:
 		instance = null
+
+
+func _detach(players: Array[AudioStreamPlayer]) -> void:
+	for player in players:
+		player.stop()
+		player.stream = null
 
 
 func _kill_fade() -> void:
