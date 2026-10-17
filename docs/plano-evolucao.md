@@ -230,21 +230,24 @@ reais e confere o resultado. Precisa rodar fora do `--headless`, como
 **Verificar.** Ele mesmo: um teste que passa é a prova de que o caminho real
 funciona.
 
-### L. Arte — **G** — **decisão antes de começar**
+### L. Arte - **decidido: geometrica em codigo**
 
-**Por quê.** É a única dependência externa do plano. Se você quer arte real
-gerada por IA, ela tem que entrar **antes** da Onda 3, senão o layout das
-fases é desenhado para bone de `Polygon2D` e jogado fora.
+**Decisao tomada.** Sem assets externos. O `PlayerRig` ja provou que 9 poses
+legiveis cabem sem um unico arquivo de imagem. O que falta e levar inimigo e
+cenario ao mesmo nivel: gradiente, curva e sombra no `Polygon2D`, em vez de
+chapado.
 
-**Duas saídas, e elas não são equivalentes:**
-- **Geométrica em código** (continuar como está): o `PlayerRig` provou que
-  9 poses legíveis cabem sem um arquivo de imagem. Inimigo e cenário ainda são
-  chapados, e um sistema de desenho com gradiente e curva levaria os dois ao
-  mesmo nível do bone.
-- **Arte importada**: mais bonito em metade do tempo, e entra uma dependência
-  de arquivo que precisa versionar, importar e reexportar.
+**Escopo.**
+- Sistema de desenho procedural: gradiente linear/radial, sombra projetada,
+  outline variavel, curva (Bezier) para plataformas e inimigos.
+- `PlayerRig` ja esta no nivel certo; so refinar (sombra, highlight).
+- Inimigos: silhueta propria (nao so cor), com 2-3 frames de animacao.
+- Cenario: montanhas com gradiente, plataformas com borda e profundidade,
+  parallax de fundo (3 camadas).
+- Moedas e itens: brilho, rotacao, sombra.
 
----
+**O que NAO entra.** Arquivos de imagem, spritesheet, animacao por frames
+externos. Se um dia quiser arte importada, este trabalho e descartado.
 
 ## Ordem sugerida
 

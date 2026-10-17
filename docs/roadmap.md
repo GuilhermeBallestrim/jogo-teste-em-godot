@@ -133,12 +133,26 @@ inimigo era dourado e sumia entre as moedas, e foi para verde.
 
 Tempo de fase, mortes, taxa de vitória, moedas por segundo.
 
-### 3.3 Arte mínima
+### 3.3 Arte minima - **decidido: geometrica em codigo**
 
-Continua zero assets. O bone procedural (`PlayerRig`) mostrou que dá para
-ter 9 poses legíveis sem um único arquivo de imagem — e que a decisão
-"geométrica em código" escala melhor do que se esperava.
+Sem assets externos. O `PlayerRig` ja provou que 9 poses legiveis cabem
+sem um unico arquivo de imagem. O que falta e levar inimigo e cenario ao
+mesmo nivel: gradiente, curva e sombra no `Polygon2D`, em vez de chapado.
 
+**Escopo.**
+- Sistema de desenho procedural: gradiente linear/radial em `Polygon2D`,
+  sombra projetada, outline variavel, curva (Bezier) para plataformas e
+  inimigos.
+- `PlayerRig` ja esta no nivel certo; so refinar (sombra, highlight).
+- Inimigos: cada um ganha silhueta propria (nao so cor), com 2-3 frames
+  de animacao (idle, hit, death).
+- Cenario: montanhas com gradiente, plataformas com borda e profundidade,
+  parallax de fundo (3 camadas).
+- Moedas e itens: brilho, rotacao, sombra.
+
+**O que NAO entra.** Arquivos de imagem, spritesheet, animacao por
+frames externos. Se um dia quiser arte importada, este trabalho e
+descartado -- por isso a decisao foi tomada antes de comecar.
 ---
 
 ## Onda 1 -- **pronta**
