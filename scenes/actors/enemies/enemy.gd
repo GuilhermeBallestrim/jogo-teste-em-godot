@@ -12,7 +12,7 @@ extends CharacterBody2D
 ## Subclasses sobrescrevem [method _apply_vertical] para mudar a locomocao
 ## (ver `slime.gd`, que pula em vez de andar).
 
-enum State { IDLE, PATROL, CHASE, AIM, ATTACK, STAGGER, DEAD }
+enum State { IDLE, PATROL, CHASE, AIM, ATTACK, STAGGER, VULNERABLE, DEAD }
 
 signal state_changed(from: State, to: State)
 signal died(enemy: Enemy)

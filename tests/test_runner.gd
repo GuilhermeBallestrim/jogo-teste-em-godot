@@ -24,6 +24,7 @@ const SCENES := [
 	"res://scenes/actors/enemies/crawler.tscn",
 	"res://scenes/actors/enemies/bomber.tscn",
 	"res://scenes/actors/enemies/guard.tscn",
+	"res://scenes/actors/enemies/boss.tscn",
 	"res://scenes/props/projectile.tscn",
 	"res://scenes/props/coin.tscn",
 	"res://scenes/props/checkpoint.tscn",
@@ -810,6 +811,7 @@ func _test_enemy_fsm() -> void:
 	await _test_crawler_enemy()
 	await _test_bomber_explosion()
 	await _test_guard_stands_post()
+	await _test_boss()
 
 
 const BAT_SCENE := "res://scenes/actors/enemies/bat.tscn"
@@ -817,6 +819,7 @@ const ARCHER_SCENE := "res://scenes/actors/enemies/archer.tscn"
 const CRAWLER_SCENE := "res://scenes/actors/enemies/crawler.tscn"
 const BOMBER_SCENE := "res://scenes/actors/enemies/bomber.tscn"
 const GUARD_SCENE := "res://scenes/actors/enemies/guard.tscn"
+const BOSS_SCENE := "res://scenes/actors/enemies/boss.tscn"
 
 
 ## Voador: a prova de que a arquitetura aceita variacao. Se o [Enemy]
@@ -1969,6 +1972,42 @@ func _test_parry() -> void:
 	var health_before: int = int(_gs.get(&"health"))
 	arena.player.call(&"apply_damage", 1, arena.enemy, Vector2.RIGHT, 100.0)
 	_check_eq(int(_gs.get(&"health")), health_before, "parry anula o dano")
+
+	arena.dispose()
+	await process_frame
+
+
+func _test_boss() -> void:
+	_begin("Enemy: boss")
+
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(true, BOSS_SCENE)
+	await process_frame
+	arena.enemy.global_position = Vector2(0, 0)
+	arena.player.global_position = Vector2(200, 0)
+	await process_frame
+
+	var boss := arena.enemy
+	var health_before: int = boss.health
+
+	boss.call(&"apply_damage", 5, arena.player, Vector2.LEFT, 0.0)
+	_check_eq(boss.health, health_before, "boss nao toma dano fora da janela")
+
+	var entered := false
+	var last_state := ""
+	for _i in 900:
+		await physics_frame
+		last_state = boss.state_name()
+		if last_state == "VULNERABLE":
+			entered = true
+			break
+	_check(entered, "boss entra em VULNERABLE")
+
+	if entered:
+		var h2: int = boss.health
+		boss.call(&"apply_damage", 5, arena.player, Vector2.LEFT, 0.0)
+		_check(boss.health < h2, "boss toma dano durante VULNERABLE")
 
 	arena.dispose()
 	await process_frame
