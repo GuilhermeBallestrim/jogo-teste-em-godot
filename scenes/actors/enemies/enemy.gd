@@ -12,12 +12,21 @@ extends CharacterBody2D
 ## Subclasses sobrescrevem [method _apply_vertical] para mudar a locomocao
 ## (ver `slime.gd`, que pula em vez de andar).
 
-enum State { IDLE, PATROL, CHASE, ATTACK, STAGGER, DEAD }
+enum State { IDLE, PATROL, CHASE, AIM, ATTACK, STAGGER, DEAD }
 
 signal state_changed(from: State, to: State)
 signal died(enemy: Enemy)
 
+## Nome do estado atual. Existe para log, UI e teste: comparar nomes sobrevive
+## a reinserir um estado no enum, enquanto um indice literal mede a coisa
+## errada em silencio.
+func state_name() -> String:
+	return String(State.keys()[state])
+
 const GRAVITY_SCALE := 1.0
+## Arrasto vertical dos inimigos que voam, em px/s^2. Evita velocidade
+## vertical infinita quando o knockback empurra o corpo para cima.
+const AIR_DRAG := 260.0
 const STOP_ACCELERATION := 1100.0
 const CHASE_ACCELERATION := 1400.0
 
@@ -29,6 +38,11 @@ const ATTACK_TIME := 0.22
 const ATTACK_RECOVER := 0.45
 const ATTACK_COOLDOWN := 0.7
 const STAGGER_TIME := 0.24
+
+## Tempo parado mirando antes de atirar. Sem essa telegrafia o tiro chega
+## no mesmo frame em que o inimigo decide atirar, e o jogador não tem como
+## reagir -- parece injusto, não difícil.
+const AIM_TIME := 0.45
 
 @export_group("Deteccao")
 @export var detect_range := 300.0
@@ -128,19 +142,39 @@ func _track_landing() -> void:
 
 
 ## Ponto de extensao: chamado no instante em que o corpo encosta no chao.
+## Quem nao tem chao (voador) nao sobrescreve.
 func _on_landed() -> void:
 	pass
 
 
+## Ponto de extensao: o corpo voa e ignora a gravidade?
+##
+## Padrao falso (todo inimigo cai). O voador liga isso e sobrescreve apenas
+## [method _apply_vertical] -- ver `bat.gd`. Existe como propriedade para
+## que a base saiba nao puxar o corpo para baixo.
+@export var flies := false:
+	set(value):
+		flies = value
+		if value:
+			# Sem isso o motor gruda o voador na plataforma mais proxima.
+			floor_snap_length = 0.0
+
+
 ## Gravidade. Subclasses sobrescrevem para ter uma locomocao diferente.
 ##
-## `get_gravity()` devolve (0,0) sem "Custom Gravity" ligado em Project
+## `get_gravity()` devolve (0,0) sem "Custom Gravity" ligado no Project
 ## Settings > Physics > 2D, entao lemos o valor do projeto como fallback.
 func _apply_vertical(delta: float) -> void:
+	if flies:
+		# Sem gravidade, mas com arrasto: evita velocidade vertical infinita
+		# quando o knockback empurra o corpo para cima.
+		velocity.y = move_toward(velocity.y, 0.0, AIR_DRAG * delta)
+		return
+
 	# `get_gravity().y` pode vir negativo; a gravidade tem de ser positiva,
 	# senao `velocity.y += g` desacelera a subida em vez de puxar para baixo.
 	#
-	# O `* delta` é obrigatório: sem ele a gravidade entrava inteira a cada
+	# O `* delta` e obrigatorio: sem ele a gravidade entrava inteira a cada
 	# frame, e o hop do slime era praticamente engolido no mesmo passo.
 	var g := absf(get_gravity().y)
 	if g == 0.0:
@@ -169,6 +203,14 @@ func _think(delta: float) -> void:
 			_patrol(delta)
 		State.CHASE:
 			_chase(delta)
+		State.AIM:
+			_stop(delta, 900.0)
+			# Janela de leitura para o jogador: o inimigo fica parado,
+			# encarando. Ao fim dela, dispara e entra em ATTACK, que é a
+			# recuperacao curta antes de voltar a perseguir.
+			if _state_timer >= AIM_TIME:
+				_fire()
+				_set_state(State.ATTACK)
 		State.ATTACK:
 			_stop(delta, 1400.0)
 			if _state_timer >= ATTACK_TIME:
@@ -205,7 +247,17 @@ func _chase(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, _facing * chase_speed, CHASE_ACCELERATION * delta)
 
 	if absf(to_target) <= attack_range and _attack_cooldown <= 0.0:
-		_set_state(State.ATTACK)
+		_set_state(State.AIM)
+
+
+## Dispara um [Projectile]. Subclasses que atiram sobrescrevem isto; o
+## padrão erra o tiro para não ter projétil em todo inimigo.
+## Dispara o ataque. Padrao: golpe corpo a corpo, ligando a hitbox.
+## Quem atira a distancia sobrescreve e cria um [Projectile].
+func _fire() -> void:
+	_hitbox.activate()
+	_hitbox_timer = HITBOX_ACTIVE_TIME
+	velocity.x = _facing * attack_lunge
 
 
 func _set_state(next: State) -> void:
@@ -219,6 +271,10 @@ func _set_state(next: State) -> void:
 		_hitbox.activate()
 		_hitbox_timer = HITBOX_ACTIVE_TIME
 		velocity.x = _facing * attack_lunge
+	elif next == State.AIM:
+		# Telegrafia: congela e prepara a mira. O tiro sai em `_fire`.
+		_hitbox.deactivate()
+		velocity.x = 0.0
 	elif next == State.CHASE and previous == State.PATROL:
 		# Ao entrar em perseguicao, já aimamos na direcao certa.
 		if _target != null:

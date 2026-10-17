@@ -15,12 +15,24 @@ const SCENES := [
 	"res://scenes/ui/options_panel.tscn",
 	"res://scenes/ui/end_screen.tscn",
 	"res://scenes/levels/level_01.tscn",
+	"res://scenes/levels/level_02.tscn",
 	"res://scenes/actors/player/player.tscn",
 	"res://scenes/actors/enemies/slime.tscn",
+	"res://scenes/actors/enemies/bat.tscn",
+	"res://scenes/actors/enemies/archer.tscn",
+	"res://scenes/props/projectile.tscn",
 	"res://scenes/props/coin.tscn",
 	"res://scenes/props/checkpoint.tscn",
 	"res://scenes/props/platform.tscn",
 ]
+
+## Fases cujo layout precisa ser provado atravessavel.
+const LEVELS := [
+	"res://scenes/levels/level_01.tscn",
+	"res://scenes/levels/level_02.tscn",
+]
+
+const MENU_SCENE := "res://scenes/ui/main_menu.tscn"
 
 var _passed := 0
 var _failed := 0
@@ -136,7 +148,49 @@ func _run_unit_tests() -> void:
 	_test_music()
 	await _test_player_physics()
 	await _test_enemy_fsm()
+	_test_level_reachability()
+	await _test_menu_lists_every_level()
 	_unit_done = true
+
+
+## O menu tem de oferecer exatamente uma entrada por fase registrada: nem
+## menos (uma fase que ninguem consegue escolher) nem mais (um botao que abre
+## um id inexistente).
+func _test_menu_lists_every_level() -> void:
+	_begin("Menu: lista de fases")
+
+	# O menu liga a musica ao entrar. Como aqui so queremos contar botoes,
+	# cortamos o audio -- e o mesmo cuidado que a suite "Cenas" toma.
+	var audio := AudioManager.instance
+	if audio != null:
+		audio.music_enabled = false
+
+	var packed := load(MENU_SCENE) as PackedScene
+	_check(packed != null, "main_menu carregou")
+	if packed == null:
+		return
+
+	var menu := packed.instantiate()
+	root.add_child(menu)
+	await process_frame
+
+	var expected := 0
+	for id: StringName in LevelRegistry.all_ids():
+		if id != &"main_menu":
+			expected += 1
+
+	var list := menu.get_node_or_null(^"Center/Column/LevelList") as VBoxContainer
+	_check(list != null, "main_menu tem a lista de fases")
+	if list != null:
+		_check(
+			list.get_child_count() == expected,
+			"a lista tem %d botao(s) para %d fase(s)"
+				% [list.get_child_count(), expected]
+		)
+		_check(list.visible == (expected > 1), "a lista so aparece com 2+ fases")
+
+	menu.free()
+	await process_frame
 
 
 func _test_layers() -> void:
@@ -291,6 +345,7 @@ func _test_save() -> void:
 
 	_check(not _save.load_game(slot), "load_game falha sem arquivo")
 
+	_test_save_peek_level_id(slot)
 	_test_save_with_missing_level(slot)
 
 
@@ -351,6 +406,63 @@ func _test_save_with_missing_level(slot: StringName) -> void:
 	_save.erase_save(slot)
 
 	_gs.reset()
+
+
+## `peek_level_id` e o que permite o menu marcar "(continuar)" sem carregar o
+## `GameState` inteiro so para desenhar um texto. O risco dele e marcado na
+## hora errada -- e por isso que os tres casos abaixo nao podem passar.
+func _test_save_peek_level_id(slot: StringName) -> void:
+	_begin("Save: peek_level_id")
+
+	var path := "user://saves/%s.json" % slot
+	_check_eq(_save.peek_level_id(slot), &"", "slot inexistente devolve vazio")
+
+	# 1. Save de verdade, apontando para a fase 2.
+	var real := {
+		"version": 2,
+		"timestamp": 0,
+		"scene_id": "level_02",
+		"scene_path": "res://scenes/levels/level_02.tscn",
+		"game_state": {"coins": 3, "score": 30, "flags": {}},
+	}
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	_check(file != null, "consegui escrever o save")
+	if file == null:
+		return
+	file.store_string(JSON.stringify(real))
+	file.close()
+	# Peek nao pode aplicar nada: e leitura, nao carga. Comparamos com o que
+	# estava antes, e nao com zero -- o GameState ja vem sujo do teste anterior.
+	var coins_before: int = _gs.coins
+	_check_eq(_save.peek_level_id(slot), &"level_02", "devolve o id do save")
+	_check_eq(_gs.coins, coins_before, "peek nao mexeu no GameState")
+
+	# 2. Save legado, sem id, so com caminho.
+	var legacy := {
+		"version": 1,
+		"timestamp": 0,
+		"scene_path": "res://scenes/levels/level_01.tscn",
+		"game_state": {"coins": 9, "score": 90, "flags": {}},
+	}
+	var legacy_file := FileAccess.open(path, FileAccess.WRITE)
+	_check(legacy_file != null, "consegui sobrescrever com o legado")
+	if legacy_file == null:
+		_save.erase_save(slot)
+		return
+	legacy_file.store_string(JSON.stringify(legacy))
+	legacy_file.close()
+	_check_eq(_save.peek_level_id(slot), &"level_01", "deduziu o id pelo caminho legado")
+
+	# 3. Lixo: nem JSON valido. Vazio e o unico resposta aceitavel -- um id
+	# inventado aqui colocaria "(continuar)" na fase errada.
+	var junk_file := FileAccess.open(path, FileAccess.WRITE)
+	_check(junk_file != null, "consegui sobrescrever com lixo")
+	if junk_file != null:
+		junk_file.store_string("isto nao e json {{{")
+		junk_file.close()
+	_check_eq(_save.peek_level_id(slot), &"", "lixo devolve vazio, nunca um id chute")
+
+	_save.erase_save(slot)
 
 
 func _test_sfx() -> void:
@@ -554,16 +666,98 @@ func _test_enemy_fsm() -> void:
 	await _test_enemy_line_of_sight()
 	await _test_enemy_attack_and_damage()
 	await _test_enemy_death()
+	await _test_flying_enemy()
+	await _test_ranged_enemy()
 
 
-## Estados do Enemy, por indice do enum.State. Nominais evitam magic number
-## espalhado no teste -- se a ordem mudar no enum, o teste avisa.
-const E_IDLE := 0
-const E_PATROL := 1
-const E_CHASE := 2
-const E_ATTACK := 3
-const E_STAGGER := 4
-const E_DEAD := 5
+const BAT_SCENE := "res://scenes/actors/enemies/bat.tscn"
+const ARCHER_SCENE := "res://scenes/actors/enemies/archer.tscn"
+
+
+## Voador: a prova de que a arquitetura aceita variacao. Se o [Enemy]
+## precisasse de mudanca para admitir um inimigo sem chao, o teste reprovaria.
+func _test_flying_enemy() -> void:
+	_begin("Enemy: voador")
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(false, BAT_SCENE)
+	arena.enemy.global_position = Vector2(0, -300)
+
+	_check(arena.enemy.flies, "marcado como voador")
+	_check(arena.enemy.floor_snap_length == 0.0, "sem snap de chao")
+
+	var start_y: float = arena.enemy.global_position.y
+	var max_drop := 0.0
+
+	for _i in 300:
+		await physics_frame
+		# Sem gravidade, nunca pode cair livremente.
+		max_drop = maxf(max_drop, arena.enemy.global_position.y - start_y)
+		if arena.enemy.is_on_floor():
+			break
+
+	_check(max_drop < 120.0, "nao caiu livremente (desvio maximo %.1f px)" % max_drop)
+	_check(not arena.enemy.is_on_floor(), "continua no ar apos 5 segundos")
+
+	# E o mesmo FSM: perto de um player, tem de perseguir.
+	arena.dispose()
+	await physics_frame
+
+	var chase_arena := EnemyArena.new()
+	root.add_child(chase_arena)
+	chase_arena.build(true, BAT_SCENE)
+	chase_arena.player.global_position = Vector2(0, -300)
+	chase_arena.enemy.global_position = Vector2(240, -300)
+
+	await chase_arena.settle(20)
+	var chased := await chase_arena.wait_for_state([&"CHASE"], 150)
+	_check(chased, "voador tambem persegue (estado=%s)" % chase_arena.enemy.state_name())
+
+	chase_arena.dispose()
+
+
+## Atirador: o ciclo de telegrafia e o projetil, que sao o que torna o tiro
+## justo em vez de impossivel de reagir.
+func _test_ranged_enemy() -> void:
+	_begin("Enemy: atirador")
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(true, ARCHER_SCENE)
+	arena.player.global_position = Vector2(0, -60)
+	arena.enemy.global_position = Vector2(240, -20)
+	arena.enemy.max_health = 999
+	arena.enemy.health = 999
+
+	await arena.settle(20)
+	_check(arena.enemy.contact_damage == 0, "nao causa dano por contato")
+
+	var aimed := await arena.wait_for_state([&"AIM"], 300)
+	_check(aimed, "entrou em AIM (telegrafia)")
+
+	# Durante o AIM o inimigo tem de ficar parado -- e a janela de leitura.
+	var still_during_aim := true
+	for _i in 12:
+		await physics_frame
+		if arena.enemy.state_name() == &"AIM" and absf(arena.enemy.velocity.x) > 40.0:
+			still_during_aim = false
+
+	_check(still_during_aim, "fica parado durante a mira")
+	_check(arena.enemy._hitbox.active == false, "hitbox corpo a corpo desligada na mira")
+
+	# O tiro precisa aparecer na cena.
+	var projectiles := get_nodes_in_group(&"projectiles")
+	var fired := false
+	for _i in 90:
+		await physics_frame
+		if not get_nodes_in_group(&"projectiles").is_empty():
+			fired = true
+			break
+
+	_check(fired, "criou um projetil")
+	_check(arena.enemy.state_name() == &"ATTACK" or arena.enemy.state_name() == &"STAGGER",
+		"entrou em recuperacao apos atirar (estado=%s)" % arena.enemy.state_name())
+
+	arena.dispose()
 
 
 ## Sem player na cena, o slime fica entre PATROL e IDLE e nunca persegue.
@@ -584,14 +778,14 @@ func _test_enemy_patrol() -> void:
 	var seen := {}
 	for _i in 300:
 		await physics_frame
-		seen[arena.enemy.state] = true
+		seen[arena.enemy.state_name()] = true
 
 	_check(
-		not seen.has(E_CHASE),
+		not seen.has(&"CHASE"),
 		"nunca entrou em CHASE sem player na cena (estados: %s)" % str(seen.keys())
 	)
 	_check(
-		seen.has(E_PATROL) or seen.has(E_IDLE),
+		seen.has(&"PATROL") or seen.has(&"IDLE"),
 		"ficou no ciclo IDLE/PATROL (estados: %s)" % str(seen.keys())
 	)
 
@@ -613,10 +807,10 @@ func _test_enemy_detects_player() -> void:
 	arena.enemy.forget_range = 700.0
 
 	await arena.settle(20)
-	_check(arena.enemy.state != E_CHASE, "comeca longe, sem perseguir ainda")
+	_check(arena.enemy.state_name() != &"CHASE", "comeca longe, sem perseguir ainda")
 
-	var chased := await arena.wait_for_state([E_CHASE], 120)
-	_check(chased, "entrou em CHASE com o jogador a 220 px (estado=%d)" % arena.enemy.state)
+	var chased := await arena.wait_for_state([&"CHASE"], 120)
+	_check(chased, "entrou em CHASE com o jogador a 220 px (estado=%s)" % arena.enemy.state_name())
 
 	var before: float = absf(arena.player.global_position.x - arena.enemy.global_position.x)
 	for _i in 30:
@@ -642,17 +836,17 @@ func _test_enemy_line_of_sight() -> void:
 
 	await arena.settle(20)
 
-	var chased := await arena.wait_for_state([E_CHASE], 150)
+	var chased := await arena.wait_for_state([&"CHASE"], 150)
 	_check(
 		not chased,
-		"NAO entrou em CHASE com parede no meio (estado=%d)" % arena.enemy.state
+		"NAO entrou em CHASE com parede no meio (estado=%s)" % arena.enemy.state_name()
 	)
 
 	# Sem CHASE, ele tem que continuar patrulhando normalmente.
 	var patrolled := false
 	for _i in 180:
 		await physics_frame
-		if arena.enemy.state in [E_PATROL, E_IDLE]:
+		if arena.enemy.state_name() in [&"PATROL", &"IDLE"]:
 			patrolled = true
 			break
 	_check(patrolled, "continua patrulhando em vez de ficar travado")
@@ -686,10 +880,9 @@ func _test_enemy_attack_and_damage() -> void:
 	# esperamos o ciclo completo passar pelo ATTACK, que liga a hitbox.
 	var start_health: int = _gs.health
 
-	# Nao verificamos passar pelo estado ATTACK: ele dura 0,22s e o slime
-	# pode cruzar entre dois passos, tornando o teste instavel. O que
-	# importa -- hitbox ligar e dano chegar -- e verificado no laco abaixo.
-	await arena.wait_for_state([E_ATTACK], 300)
+	# O ciclo agora passa por AIM (telegrafia) antes de ATTACK, entao
+	# esperamos qualquer um dos dois estados de ataque.
+	await arena.wait_for_state([&"AIM", &"ATTACK"], 300)
 
 	var damaged := false
 	var saw_hitbox_active := false
@@ -704,8 +897,8 @@ func _test_enemy_attack_and_damage() -> void:
 	_check(saw_hitbox_active, "a hitbox ficou ativa durante o ataque")
 	_check(damaged, "o golpe tirou vida do player (%d -> %d)" % [start_health, _gs.health])
 
-	var recovered := await arena.wait_for_state([E_CHASE, E_PATROL], 180)
-	_check(recovered, "saiu do ataque para CHASE ou PATROL (estado=%d)" % arena.enemy.state)
+	var recovered := await arena.wait_for_state([&"CHASE", &"PATROL"], 180)
+	_check(recovered, "saiu do ataque para CHASE ou PATROL (estado=%s)" % arena.enemy.state_name())
 
 	_gs.reset()
 	arena.dispose()
@@ -733,7 +926,7 @@ func _test_enemy_death() -> void:
 	arena.enemy.apply_damage(5, null, Vector2.RIGHT, 100.0)
 	await physics_frame
 
-	_check(arena.enemy.state == E_DEAD, "entrou em DEAD (estado=%d)" % arena.enemy.state)
+	_check(arena.enemy.state_name() == &"DEAD", "entrou em DEAD (estado=%s)" % arena.enemy.state_name())
 	_check(died[0], "emitiu o sinal died")
 	_check(_gs.score > score_before, "somou pontos ao morrer (%d -> %d)" % [score_before, _gs.score])
 	_check(arena.enemy.health <= 0, "vida zerou ou ficou negativa (%d)" % arena.enemy.health)
@@ -743,12 +936,211 @@ func _test_enemy_death() -> void:
 
 	arena.enemy.apply_damage(5, null, Vector2.RIGHT, 100.0)
 	await physics_frame
-	_check(arena.enemy.state == E_DEAD, "ignora dano apos morto")
+	_check(arena.enemy.state_name() == &"DEAD", "ignora dano apos morto")
 	_check(_gs.score == score_before + 50, "nao pontua duas vezes")
 
 	_gs.reset()
 	arena.dispose()
 
+
+
+# ------------------------------------------------- balistica das fases
+
+## Prova que o layout de cada fase e atravessavel com o pulo do [Player].
+##
+## Sem isto, mexer numa posicao no editor passa despercebido e a fase fica
+## impossível -- e ninguem descobre ate jogar ate o fim e travar no meio.
+##
+## O modelo e a balistica real do pulo (ver [PlayerTuning]), incluindo o
+## `APEX_GRAVITY_SCALE`. O que ele ignora e a rampa de aceleracao do
+## jogador, que so ajuda: um modelo que a ignora so pode acusar um vao
+## impossível quando ele e de fato impossivel.
+##
+## E um grafo, nao uma comparacao par a par: na fase 1 as plataformas
+## flutuantes ficam altas demais para sair do chao, mas o caminho existe
+## passando por elas. So o grafo sabe disso.
+func _test_level_reachability() -> void:
+	_begin("Fases: layout atravessavel")
+
+	var max_rise := PlayerTuning.max_jump_height()
+	_check(max_rise > 200.0, "o pulo sobe %.0f px" % max_rise)
+	_check(
+		PlayerTuning.jump_reach(max_rise) <= 0.0,
+		"pulo nao alcanca a propria altura maxima (%.0f px)" % max_rise
+	)
+
+	for level_path: String in LEVELS:
+		_test_one_level_is_completable(level_path)
+
+
+## Uma fase e jogavel se todas as plataformas -- e todas as moedas -- sao
+## alcancaveis a partir de onde o jogador nasce.
+func _test_one_level_is_completable(level_path: String) -> void:
+	var name := level_path.get_file().get_basename()
+	var packed := load(level_path) as PackedScene
+	_check(packed != null, "%s carregou" % name)
+	if packed == null:
+		return
+
+	# Nao entra na arvore de proposito: o `_ready` das fases puxa GameState,
+	# HUD e musica, e aqui so queremos ler geometria.
+	var level := packed.instantiate()
+	var platforms_node := level.get_node_or_null(^"Platforms")
+	_check(platforms_node != null, "%s tem o no Platforms" % name)
+	if platforms_node == null:
+		level.free()
+		return
+
+	var boxes: Array[Rect2] = []
+	for child in platforms_node.get_children():
+		var platform := child as Platform
+		if platform == null:
+			continue
+		# `position` e o centro da plataforma; a superficie e o topo.
+		boxes.append(Rect2(platform.position - platform.size * 0.5, platform.size))
+
+	_check(boxes.size() >= 2, "%s tem %d plataformas" % [name, boxes.size()])
+	if boxes.size() < 2:
+		level.free()
+		return
+
+	var spawn_x := _spawn_x(level)
+	var start := _platform_under(boxes, spawn_x)
+	_check(start >= 0, "%s tem chao embaixo do SpawnPoint (x=%.0f)" % [name, spawn_x])
+	if start < 0:
+		level.free()
+		return
+
+	var reachable := _reachable_platforms(boxes, start)
+
+	# Toda plataforma tem de ser alcancavel, nao so a ultima. Uma ilha
+	# flutuante que ninguem alcanca e um beco sem saida -- o jogador chega
+	# nela (as vezes) e nao sai, ou nunca chega e a fase tem um buraco.
+	# Reportar cada uma e melhor que um unico "a fase fecha?", porque ai
+	# aparece o nome e a posicao exata do problema.
+	var names := _platform_names(platforms_node)
+	var islands := 0
+	for i in boxes.size():
+		if reachable[i] == 1:
+			continue
+		islands += 1
+		_check(
+			false,
+			"%s: %s e uma ilha (topo %.0f, x de %.0f a %.0f)"
+				% [name, names[i], boxes[i].position.y, boxes[i].position.x, boxes[i].end.x]
+		)
+	if islands == 0:
+		_check(true, "%s: todas as %d plataformas ligadas entre si" % [name, boxes.size()])
+
+	var lost := 0
+	var coins_node := level.get_node_or_null(^"Coins")
+	_check(coins_node != null, "%s tem o no Coins" % name)
+	for child in coins_node.get_children() if coins_node != null else []:
+		var coin := child as Node2D
+		if coin == null:
+			continue
+		if _coin_is_reachable(coin.position, boxes, reachable):
+			continue
+		lost += 1
+		_check(false, "%s: moeda %s em (%.0f, %.0f) e inalcancavel" % [name, coin.name, coin.position.x, coin.position.y])
+
+	if lost == 0:
+		_check(true, "%s: todas as moedas alcancaveis" % name)
+
+	level.free()
+
+
+## Nome de cada plataforma, na mesma ordem em que [method
+## _test_one_level_is_completable] monta os retangulos.
+func _platform_names(platforms_node: Node) -> PackedStringArray:
+	var out := PackedStringArray()
+	for child in platforms_node.get_children():
+		if child is Platform:
+			out.append(child.name)
+	return out
+
+
+## Posicao horizontal de nascimento: SpawnPoint, ou o Player se a fase nao
+## declarar o marcador.
+func _spawn_x(level: Node) -> float:
+	var marker := level.get_node_or_null(^"SpawnPoint") as Node2D
+	if marker != null:
+		return marker.position.x
+	var player := level.get_node_or_null(^"Player") as Node2D
+	if player != null:
+		return player.position.x
+	return 0.0
+
+
+## Indice da plataforma cujo topo fica logo abaixo de `x`, ou -1.
+func _platform_under(boxes: Array[Rect2], x: float) -> int:
+	var best := -1
+	var best_top := INF
+	for i in boxes.size():
+		var box := boxes[i]
+		if x < box.position.x or x > box.end.x:
+			continue
+		if box.position.y < best_top:
+			best_top = box.position.y
+			best = i
+	return best
+
+
+## Fecha o grafo de um pulo a partir de `start` e devolve quais plataformas
+## o jogador consegue alcancar.
+##
+## De `a` chega-se em `b` quando a altura pedida cabe no pulo e o alcance
+## horizontal do arco encosta na `b`. O alcance e medido a partir das duas
+## bordas de `a`, porque o jogador pode decolar de qualquer ponto dela.
+func _reachable_platforms(boxes: Array[Rect2], start: int) -> PackedByteArray:
+	var seen := PackedByteArray()
+	seen.resize(boxes.size())
+	var queue: Array[int] = [start]
+	seen[start] = 1
+
+	while not queue.is_empty():
+		var i: int = queue.pop_back()
+		var a := boxes[i]
+		for j in boxes.size():
+			if seen[j] == 1:
+				continue
+			var b := boxes[j]
+			# No Godot +y aponta para BAIXO. `rise` aqui e "quantos px a
+			# plataforma de destino esta acima da de origem".
+			var rise := a.position.y - b.position.y
+			var reach := PlayerTuning.jump_reach(rise)
+			if reach <= 0.0:
+				continue
+			# O arco cobre [a.left - reach, a.right + reach]; se isso cruza
+			# `b`, existe um ponto de decolagem que chega nela.
+			if a.position.x - reach > b.end.x:
+				continue
+			if a.end.x + reach < b.position.x:
+				continue
+			seen[j] = 1
+			queue.append(j)
+
+	return seen
+
+
+## Uma moeda e alcancavel se existe uma plataforma visitada logo abaixo
+## dela, dentro do alcance lateral do pulo a partir dessa plataforma.
+func _coin_is_reachable(pos: Vector2, boxes: Array[Rect2], reachable: PackedByteArray) -> bool:
+	for i in boxes.size():
+		if reachable[i] == 0:
+			continue
+		var box := boxes[i]
+		if pos.y > box.position.y + 8.0:
+			continue
+		# Mesma convencao do grafo: +y e para baixo, entao "acima" e subtrair
+		# a posicao da moeda da posicao da plataforma.
+		var rise := box.position.y - pos.y
+		var reach := PlayerTuning.jump_reach(rise)
+		if reach <= 0.0:
+			continue
+		if pos.x >= box.position.x - reach and pos.x <= box.end.x + reach:
+			return true
+	return false
 
 
 # ------------------------------------------------- integracao (multi-frame)

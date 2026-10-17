@@ -10,54 +10,35 @@ signal died
 signal damaged(amount: int, source: Node)
 signal landed(impact_speed: float)
 
-const SPEED := 340.0
-const GROUND_ACCELERATION := 2800.0
-const AIR_ACCELERATION := 1600.0
-const GROUND_FRICTION := 3200.0
-const AIR_FRICTION := 900.0
-
-## Velocidade de subida. Com gravidade 980 e APEX_GRAVITY_SCALE 0,62 isso
-## da ~310 px de altura -- folgado para os 195 px que a fase exige (subir da
-## Coin11 em y=-450 passa a ser comfortably possível sem salto minúsculo).
-const JUMP_VELOCITY := -760.0
-## Multiplicador aplicado quando o botao e solto no meio do pulo.
-## 1.0 = altura fixa; menor = o pulo encurta e o controle fica mais fino.
-const JUMP_CUT := 0.45
-const COYOTE_TIME := 0.10
-const JUMP_BUFFER := 0.12
-## Multiplicador da gravidade no topo do arco. Abaixo de 1 o jogador "flutua"
-## no apice, o que da tempo de ajustar a direcao no ar -- mas tambem aumenta a
-## altura total do pulo, entao andar para 1.0 encurta o arco sem perder o
-## controle no topo.
-const APEX_GRAVITY_SCALE := 0.75
-const APEX_VELOCITY_THRESHOLD := 220.0
-const HARD_LANDING_SPEED := 700.0
-## Folga para tirar o pé da superfície antes do impulso do pulo.
-const JUMP_CLEARANCE := 1.5
-
-const DASH_SPEED := 980.0
-const DASH_TIME := 0.14
-const DASH_COOLDOWN := 0.55
-const DASH_END_SPEED_RATIO := 0.7
-
-const ATTACK_COOLDOWN := 0.32
-const ATTACK_ACTIVE_TIME := 0.14
-const ATTACK_DAMAGE := 1
-const ATTACK_REACH := 28.0
-
-const IFRAME_TIME := 1.0
-const HURT_KNOCKBACK := 420.0
+## Os numeros vivem em [PlayerTuning] para que os testes possam usa-los sem
+## compilar este script. Aqui sao apenas apelidos, para o corpo do codigo
+## continuar legivel como `SPEED` e nao `PlayerTuning.SPEED`.
+const SPEED := PlayerTuning.SPEED
+const GROUND_ACCELERATION := PlayerTuning.GROUND_ACCELERATION
+const AIR_ACCELERATION := PlayerTuning.AIR_ACCELERATION
+const GROUND_FRICTION := PlayerTuning.GROUND_FRICTION
+const AIR_FRICTION := PlayerTuning.AIR_FRICTION
+const JUMP_VELOCITY := PlayerTuning.JUMP_VELOCITY
+const JUMP_CUT := PlayerTuning.JUMP_CUT
+const COYOTE_TIME := PlayerTuning.COYOTE_TIME
+const JUMP_BUFFER := PlayerTuning.JUMP_BUFFER
+const APEX_GRAVITY_SCALE := PlayerTuning.APEX_GRAVITY_SCALE
+const APEX_VELOCITY_THRESHOLD := PlayerTuning.APEX_VELOCITY_THRESHOLD
+const HARD_LANDING_SPEED := PlayerTuning.HARD_LANDING_SPEED
+const JUMP_CLEARANCE := PlayerTuning.JUMP_CLEARANCE
+const DASH_SPEED := PlayerTuning.DASH_SPEED
+const DASH_TIME := PlayerTuning.DASH_TIME
+const DASH_COOLDOWN := PlayerTuning.DASH_COOLDOWN
+const DASH_END_SPEED_RATIO := PlayerTuning.DASH_END_SPEED_RATIO
+const ATTACK_COOLDOWN := PlayerTuning.ATTACK_COOLDOWN
+const ATTACK_ACTIVE_TIME := PlayerTuning.ATTACK_ACTIVE_TIME
+const ATTACK_DAMAGE := PlayerTuning.ATTACK_DAMAGE
+const ATTACK_REACH := PlayerTuning.ATTACK_REACH
+const IFRAME_TIME := PlayerTuning.IFRAME_TIME
+const HURT_KNOCKBACK := PlayerTuning.HURT_KNOCKBACK
+const DEFAULT_GRAVITY := PlayerTuning.DEFAULT_GRAVITY
 
 @export var gravity_scale := 1.0
-
-## Gravidade aplicada quando `get_gravity()` devolve zero.
-##
-## `get_gravity()` so funciona se a opcao "Custom Gravity" estiver marcada em
-## Project Settings > Physics > 2D. Como nao queremos depender de uma caixa de
-## selecao, lemos o valor ourselves. Sem isto o corpo nao tem gravidade, nunca
-## fica `is_on_floor()` de forma confiavel e o coyote time nunca preenche --
-## o que trava o pulo e faz o personagem flutuar.
-const DEFAULT_GRAVITY := 980.0
 
 var _coyote_timer := 0.0
 var _jump_buffer_timer := 0.0

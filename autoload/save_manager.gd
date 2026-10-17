@@ -64,22 +64,10 @@ func load_game(slot: StringName = DEFAULT_SLOT) -> bool:
 		save_failed.emit(slot, "Nenhum save encontrado em '%s'." % path)
 		return false
 
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		var reason := "Nao foi possivel abrir '%s' para leitura (erro %d)." % [path, FileAccess.get_open_error()]
-		push_error("Save: " + reason)
-		save_failed.emit(slot, reason)
+	var data := _read_payload(path)
+	if data.is_empty():
+		save_failed.emit(slot, "Save corrompido ou vazio em '%s'." % path)
 		return false
-
-	var text := file.get_as_text()
-	file.close()
-
-	var parsed: Variant = JSON.parse_string(text)
-	if typeof(parsed) != TYPE_DICTIONARY:
-		save_failed.emit(slot, "Save corrompido: JSON invalido.")
-		return false
-
-	var data: Dictionary = parsed
 	var version := int(data.get("version", 0))
 	# Versao 1 (pre-registro) so tinha `scene_path` e ainda e valido: o id
 	# e deduzido pelo caminho. Acima da atual, o formato mudou demais.
@@ -120,6 +108,52 @@ func load_game(slot: StringName = DEFAULT_SLOT) -> bool:
 
 func has_save(slot: StringName = DEFAULT_SLOT) -> bool:
 	return FileAccess.file_exists(_path_for(slot))
+
+
+## Le o JSON de um slot sem aplicar nada. Vazio quando nao ha arquivo, o
+## arquivo esta corrompido ou o JSON nao parseia.
+##
+## Usa [method JSON.parse] em vez de [method JSON.parse_string] de proposito:
+## `parse_string` imprime "Parse JSON failed" no console sempre que falha, e
+## um save corrompido e um caso que o jogador pode encontrar -- nao queremos
+## poluir o log com isso a cada leitura.
+func _read_payload(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {}
+	var text := file.get_as_text()
+	file.close()
+
+	var json := JSON.new()
+	if json.parse(text) != OK:
+		push_warning("Save: '%s' nao e JSON valido (%s)." % [path, json.get_error_message()])
+		return {}
+
+	var parsed: Variant = json.data
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	return parsed
+
+
+## Id da fase gravada, **sem** aplicar o save.
+##
+## O menu precisa saber onde o jogador parou só para escrever um "(continuar)"
+## no botão certo, e não vale a pena carregar o `GameState` inteiro para isso.
+## Leitura crua do arquivo de propósito: quem conhece o formato é o `Save`,
+## não a UI.
+func peek_level_id(slot: StringName = DEFAULT_SLOT) -> StringName:
+	var data := _read_payload(_path_for(slot))
+	if data.is_empty():
+		return &""
+
+	var id := StringName(String(data.get("scene_id", "")))
+	if id != &"" and LevelRegistry.has(id):
+		return id
+	# Save antigo: sem id, mas com caminho ainda vivo.
+	return LevelRegistry.id_for_path(String(data.get("scene_path", "")))
 
 
 func erase_save(slot: StringName = DEFAULT_SLOT) -> bool:

@@ -1,0 +1,63 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scenes/actors/enemies/archer.gd" id="1_archer"]
+[ext_resource type="Script" path="res://src/combat/hurtbox.gd" id="2_hurtbox"]
+[ext_resource type="Script" path="res://src/combat/hitbox.gd" id="3_hitbox"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hurt"]
+radius = 18.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hit"]
+radius = 20.0
+
+[node name="Archer" type="CharacterBody2D" groups=["enemies"]]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1_archer")
+body_size = Vector2(28, 34)
+body_color = Color(0.396, 0.545, 0.639, 1)
+patrol_left = -110.0
+patrol_right = 110.0
+detect_range = 380.0
+forget_range = 560.0
+attack_range = 320.0
+max_health = 3
+contact_damage = 0
+
+[node name="Sprite" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-14, -17, 14, -17, 14, 17, -14, 17)
+color = Color(0.396, 0.545, 0.639, 1)
+
+[node name="Eye" type="Polygon2D" parent="Sprite"]
+position = Vector2(4, -8)
+polygon = PackedVector2Array(-3, -3, 3, -3, 3, 2, -3, 2)
+color = Color(0.078, 0.086, 0.125, 1)
+
+[node name="Bow" type="Polygon2D" parent="Sprite"]
+position = Vector2(15, -2)
+polygon = PackedVector2Array(0, -12, 7, 0, 0, 12, 3, 0)
+color = Color(0.651, 0.478, 0.298, 1)
+
+[node name="HealthBar" type="ColorRect" parent="."]
+visible = false
+offset_left = -15.0
+offset_top = -24.0
+offset_right = 15.0
+offset_bottom = -20.0
+color = Color(0.949, 0.31, 0.361, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = null
+
+[node name="Hurtbox" type="Area2D" parent="."]
+script = ExtResource("2_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("CircleShape2D_hurt")
+
+[node name="Hitbox" type="Area2D" parent="."]
+position = Vector2(24, 0)
+script = ExtResource("3_hitbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
+shape = SubResource("CircleShape2D_hit")

@@ -71,11 +71,14 @@ func step(frames: int) -> void:
 		await get_tree().physics_frame
 
 
-## Espera algum estado qualquer entre os previstos, com limite de tempo.
+## Espera o inimigo entrar em algum dos estados previstos, com limite de
+## tempo. Recebe NOMES ("CHASE"), nao indices: quem chama nao precisa
+## conhecer a ordem do enum -- e assim o teste continua valendo depois que
+## um estado novo for inserido no meio.
 func wait_for_state(states: Array, max_frames: int) -> bool:
 	for _i in max_frames:
 		await get_tree().physics_frame
-		if states.has(enemy.state):
+		if states.has(enemy.state_name()):
 			return true
 	return false
 

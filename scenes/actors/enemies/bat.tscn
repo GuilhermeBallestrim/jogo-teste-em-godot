@@ -1,0 +1,73 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scenes/actors/enemies/bat.gd" id="1_bat"]
+[ext_resource type="Script" path="res://src/combat/hurtbox.gd" id="2_hurtbox"]
+[ext_resource type="Script" path="res://src/combat/hitbox.gd" id="3_hitbox"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hurt"]
+radius = 17.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hit"]
+radius = 19.0
+
+[node name="Bat" type="CharacterBody2D" groups=["enemies"]]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1_bat")
+body_size = Vector2(30, 22)
+body_color = Color(0.482, 0.372, 0.639, 1)
+patrol_left = -140.0
+patrol_right = 140.0
+detect_range = 340.0
+forget_range = 520.0
+attack_range = 54.0
+max_health = 2
+contact_damage = 1
+
+[node name="Sprite" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-15, -11, 15, -11, 15, 11, -15, 11)
+color = Color(0.482, 0.372, 0.639, 1)
+
+[node name="WingLeft" type="Polygon2D" parent="Sprite"]
+position = Vector2(-14, -2)
+polygon = PackedVector2Array(0, -9, -16, -2, 0, 5)
+color = Color(0.353, 0.271, 0.478, 1)
+
+[node name="WingRight" type="Polygon2D" parent="Sprite"]
+position = Vector2(14, -2)
+polygon = PackedVector2Array(0, -9, 16, -2, 0, 5)
+color = Color(0.353, 0.271, 0.478, 1)
+
+[node name="EyeLeft" type="Polygon2D" parent="Sprite"]
+position = Vector2(-5, -2)
+polygon = PackedVector2Array(-2.5, -3, 2.5, -3, 2.5, 2, -2.5, 2)
+color = Color(0.949, 0.878, 0.404, 1)
+
+[node name="EyeRight" type="Polygon2D" parent="Sprite"]
+position = Vector2(5, -2)
+polygon = PackedVector2Array(-2.5, -3, 2.5, -3, 2.5, 2, -2.5, 2)
+color = Color(0.949, 0.878, 0.404, 1)
+
+[node name="HealthBar" type="ColorRect" parent="."]
+visible = false
+offset_left = -16.0
+offset_top = -20.0
+offset_right = 16.0
+offset_bottom = -16.0
+color = Color(0.949, 0.31, 0.361, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = null
+
+[node name="Hurtbox" type="Area2D" parent="."]
+script = ExtResource("2_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("CircleShape2D_hurt")
+
+[node name="Hitbox" type="Area2D" parent="."]
+position = Vector2(24, 0)
+script = ExtResource("3_hitbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
+shape = SubResource("CircleShape2D_hit")

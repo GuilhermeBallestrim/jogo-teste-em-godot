@@ -43,6 +43,7 @@ func _ready() -> void:
 		GameState.reset()
 	_apply_camera_limits()
 	_hud.set_coin_goal(coins_to_win)
+	_check_goal_is_reachable()
 	_player.died.connect(_on_player_died)
 	Music.play()
 
@@ -50,8 +51,45 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if is_finished or coins_to_win <= 0:
 		return
+	# Objetivo declarado: a fase sabe quantas moedas existem. Contando o
+	# GameState solto, um bug de colecionavel (moeda nao creditada, ou
+	# creditada duas vezes) mudaria silenciosamente o alvo.
 	if GameState.coins >= coins_to_win:
 		_win()
+		return
+	# Gancho para fases com vitória além de contagem (chegada, boss, tempo).
+	check_extra_victory()
+
+
+## Soma do valor das moedas que ainda estao na cena. Diferente de
+## [member GameState.coins]: conta o que *existe*, nao o que foi creditado.
+## A divergencia entre os dois denuncia moeda que nao credita, ou credita duas
+## vezes.
+##
+## Soma [member Coin.value] em vez de contar nos: uma moeda de valor 2 vale
+## duas para o objetivo, e o balanceamento pode oferecer moeda cara sem
+## esticar o numero de objetos na fase.
+func count_remaining_value() -> int:
+	var total := 0
+	for node in get_tree().get_nodes_in_group(&"coins"):
+		var coin := node as Coin
+		if coin != null:
+			total += coin.value
+	return total
+
+
+## Erro de conteudo, nao de codigo: pedir mais moedas do que a fase tem
+## deixa a vitoria inalcancavel e o jogador preso para sempre. Em vez de
+## deixar isso passar em silencio, dizemos na hora em que a fase carrega.
+func _check_goal_is_reachable() -> void:
+	var available := count_remaining_value()
+	if coins_to_win <= 0 or available == 0:
+		return
+	if coins_to_win > available:
+		push_warning(
+			"[%s] pede %d pontos de moeda mas a cena so soma %d: a fase e imposible."
+			% [name, coins_to_win, available]
+		)
 
 
 func _apply_camera_limits() -> void:

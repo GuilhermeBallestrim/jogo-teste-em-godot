@@ -78,6 +78,12 @@ custom_minimum_size = Vector2(260, 0)
 layout_mode = 2
 text = "Sair"
 
+[node name="LevelList" type="VBoxContainer" parent="Center/Column"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+
 [node name="SaveHintLabel" type="Label" parent="Center/Column"]
 unique_name_in_owner = true
 visible = false

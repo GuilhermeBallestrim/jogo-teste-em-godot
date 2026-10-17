@@ -1,7 +1,7 @@
 # Plano — Etapa 2
 
-Estado atual: 38 arquivos, ~2.720 linhas, 127 testes verdes, 8 commits.
-Uma fase, um inimigo, zero assets de arte.
+Estado atual: duas fases, três inimigos, zero assets de arte, 218 verificações
+verdes.
 
 O objetivo desta etapa é sair de "protótipo demonstrável" para "jogo com
 ciclo completo e estrutura que aguenta crescer". A ordem não é decorativa:
@@ -51,44 +51,70 @@ Ponto de extensão para fases especiais: `check_extra_victory()` e
 
 ---
 
-## Fase 1 — Conteúdo (3 a 4 dias)
+## Fase 1 — Conteúdo — **feito**
 
-### 1.1 Inimigo voador
+### 1.1 Inimigo voador — **feito**
 
-O teste mais barato da arquitetura: se `Enemy` aguenta variação sem
-reescrita, a arquitetura serve.
+`scenes/actors/enemies/bat.gd` estende `Enemy` sobrescrevendo apenas
+`_apply_vertical()` (onda senoidal em vez de gravidade) e ligando `flies`.
+**Não** sobrescreve `_on_landed()`, porque não tem chão — o gancho existe e
+fica sem uso, que é exatamente o que a 0.1 promete.
 
-Novo `bat.gd` estende `Enemy` sobrescrevendo apenas:
-- `_apply_vertical()` — zera a gravidade, aplica sustentação
-- `_on_landed()` — não existe para voador, o que prova que o ponto de
-  extensão funciona
+O gancho novo no `Enemy` é a propriedade `flies`: ligada, ela zera o
+`floor_snap_length` (sem isso o motor gruda o voador na plataforma mais
+próxima) e troca a gravidade por arrasto.
 
-Adicionar ao `Enemy` um gancho novo: `_can_fly` / `_vertical_mode`, para
-não depender de sobrescrever método com nome interno.
+### 1.2 Inimigo atirador — **feito**
 
-### 1.2 Inimigo_atirador
+`scenes/props/projectile.gd` (`Projectile`) é uma `Area2D` com uma `Hitbox`
+dentro: o dano vem do mesmo caminho do golpe corpo a corpo, sem uma linha
+duplicada. Ele se destrói em `Hitbox.hit`.
 
-Testa a **outra** metade do sistema de combate: dano à distância em vez de
-contato.
+`scenes/actors/enemies/archer.gd` sobrescreve `_fire()` para criar o projétil e
+`_chase()` para atacar fora do alcance de contato. O estado novo `AIM` na FSM
+(dentro do `Enemy`, não do `archer`) dá os 0,45 s de telegrafia — inclusive
+para o slime, que agora mira antes de golpear.
 
-Requer: projétil como `Area2D` reaproveitando `Hitbox`, telegrafia (0.4s
-parado antes de atirar) e um estado novo `AIM` na FSM.
+### 1.3 Segunda fase — **feito**
 
-### 1.3 Segunda fase
+`scenes/levels/level_02.tscn` (`level_02.gd`, 8 linhas) é o oposto da fase 1:
+torres empilhadas em vez de corredores. Registrada em
+`SceneRouter._register_levels()`.
 
-O `SceneRouter` tem **um destino só** hoje. Nenhum `goto()` entre duas
-fases jamais rodou — é exatamente onde fade travado e save corrompido vão
-aparecer.
+O menu ganhou a lista de fases, montada a partir do `LevelRegistry` (adicionar
+uma fase = uma linha no router). Cada botão que corresponde ao save recebe
+"(continuar)", lido por `Save.peek_level_id()` sem carregar o `GameState`.
 
-Nova fase com o oposto da primeira: corredores altos e estreitos, few
-plataformas, mais voadores. Usar o `level_base` da 0.2.
+**Achei um bug grave no caminho:** o teste de balística das fases (ver 1.5)
+mostrou que a fase 1 tinha duas plataformas órfãs que a tornavam
+**invencível** — `Float2` e `Float4` ficavam 342 px e 402 px acima do chão, e o
+pulo do player sobe 303 px. O layout das duas fases foi refeito com a balística
+na mão.
 
-Menu passa a ter seletor de fase (mostrar progresso por slot).
+### 1.4 Coletável de valor — **feito**
 
-### 1.4 Coletável de valor
+`Coin.value` (que já existia) ganhou companhia: `Coin.tint` para o visual
+acompanhar, e o `LevelBase` passou a somar **valores** em vez de contar nós
+(`count_remaining_value()`). A fase 2 tem 10 moedas, uma delas de valor 2, e
+`coins_to_win = 11`.
 
-Hoje `coins_to_win` é um número solto na fase. Com duas fases a contagem
-fica frágil — trocar `GameState.reset()` por objetivo declarado no level.
+`LevelBase._check_goal_is_reachable()` avisa no `push_warning` quando a fase
+pede mais do que a cena soma: antes isso era um bug silencioso que deixava o
+jogador preso para sempre.
+
+### 1.5 Prova de que o level design funciona — **extra**
+
+Não estava no plano, e virou o item mais útil da fase.
+
+`tests/test_runner.gd` fecha um grafo das plataformas de cada fase usando a
+balística real do pulo (`PlayerTuning.jump_reach`, que inclui o
+`APEX_GRAVITY_SCALE`). Uma fase é jogável quando todas as plataformas e todas
+as moedas são alcançáveis a partir do `SpawnPoint`. É um grafo, e não uma
+comparação par a par, porque na fase 1 o caminho válido passa por plataformas
+que, sozinhas, são altas demais para sair do chão.
+
+Verificado por controle negativo: mover uma moeda 100 px para fora de alcance
+faz a suíte falhar com o nome e a posição exatos.
 
 ---
 
@@ -99,6 +125,9 @@ fica frágil — trocar `GameState.reset()` por objetivo declarado no level.
 `GameState.coins` é contador puro. Adicionar `items: Array[StringName]`
 com um `Resource` de definition por item (nome, ícone, efeito). Isso é o
 que transforma "coletável" em "sistema" e dá destino ao slot de save.
+
+O `Coin.value` e o `Coin.tint` da Fase 1.4 já são metade disso: falta a
+tabela de itens e o consumo no `Player`.
 
 ### 2.2 Remapeamento de teclas
 
@@ -148,8 +177,8 @@ Decidir depois que o jogo tiver forma. A troca é barata: o script lê
 ## Ordenação
 
 ```
-Fase 0  testes do FSM  ->  base da fase  ->  save/reset
-Fase 1  voador -> atirador -> fase 2 -> coletável
+Fase 0  testes do FSM  ->  base da fase  ->  save/reset      [feito]
+Fase 1  voador -> atirador -> fase 2 -> coletável          [feito]
 Fase 2  inventário -> remapear -> acessibilidade -> i18n
 Fase 3  feedback -> stats -> arte
 ```
@@ -162,17 +191,27 @@ Fase 2 inteira depende da Fase 1 existir para ter conteúdo que consuma.
 ## Risco
 
 O item de maior risco é a **Fase 2.4 (i18n)**. É o único que toca todo
-arquivo de uma vez e o único em que uma decisão errada (fazer tarde demais)
+arquivo de vez e o único em que uma decisão errada (fazer tarde demais)
 custa caro. Se o tempo apertar, é o primeiro a cortar — o resto é
 adiável sem retrabalho.
 
 O segundo é a **Fase 3.3 (arte)**: se você já tem preferência definida por
 ferramenta de arte, o item vira dependência externa e precisa entrar antes.
 
+### Risco que já virou realidade
+
+**Nível não testado é nível possivelmente impossível.** A fase 1 ficou weeks
+sem ninguém perceber que não dava para terminar. O teste de balística (1.5)
+existe para isso não voltar: qualquer `position` nova passa por ele.
+
+A lição prática: o que não tem verificação automatizada precisa de uma
+verificação manual — e manual não é o mesmo que feita.
+
 ---
 
 ## Sugestão de corte
 
-Se for fazer só uma parte: **Fase 0 completa**. É pequena (1-2 dias) e é
-o que permite adicionar conteúdo com segurança depois. Sem ela, cada
-inimigo novo é um sistema sem rede.
+A Fase 1 está feita. O próximo bloco que mais rende é a **Fase 2.1
+(inventário)**: com três inimigos e um coletável de valor, o save tem um
+formato para dar e o `Coin` já é a base do item. O 2.3 (acessibilidade) é o
+melhor candidato a corte — nada trava e é adiável.

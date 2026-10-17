@@ -10,12 +10,12 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="8_hud"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kill"]
-size = Vector2(2800, 60)
+size = Vector2(3200, 60)
 
 [node name="Level01" type="Node2D"]
 script = ExtResource("1_level")
 coins_to_win = 12
-camera_limits = Rect2(-1240, -780, 2480, 1200)
+camera_limits = Rect2(-1260, -430, 3120, 570)
 
 [node name="Background" type="CanvasLayer" parent="."]
 layer = -10
@@ -43,53 +43,57 @@ position = Vector2(-1080, -60)
 [node name="Platforms" type="Node2D" parent="."]
 
 [node name="Ground1" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(-980, 40)
-size = Vector2(440, 80)
-
-[node name="Ground2" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(-430, 40)
-size = Vector2(340, 80)
-
-[node name="Ground3" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(150, 40)
-size = Vector2(420, 80)
-
-[node name="Ground4" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(880, 40)
-size = Vector2(640, 80)
+position = Vector2(-1000, 40)
+size = Vector2(400, 80)
 
 [node name="Float1" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(-680, -200)
+position = Vector2(-630, -208)
 size = Vector2(180, 24)
 body_color = Color(0.23921, 0.29803, 0.38431, 1)
 top_color = Color(0.976, 0.776, 0.251, 1)
+
+[node name="Ground2" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(-330, 40)
+size = Vector2(300, 80)
 
 [node name="Float2" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(-160, -330)
+position = Vector2(-70, -248)
 size = Vector2(180, 24)
 body_color = Color(0.23921, 0.29803, 0.38431, 1)
 top_color = Color(0.976, 0.776, 0.251, 1)
+
+[node name="Ground3" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(280, 40)
+size = Vector2(400, 80)
 
 [node name="Float3" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(460, -210)
+position = Vector2(630, -228)
 size = Vector2(180, 24)
 body_color = Color(0.23921, 0.29803, 0.38431, 1)
 top_color = Color(0.976, 0.776, 0.251, 1)
 
+[node name="Ground4" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(980, 40)
+size = Vector2(400, 80)
+
 [node name="Float4" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(870, -390)
-size = Vector2(220, 24)
+position = Vector2(1340, -268)
+size = Vector2(200, 24)
 body_color = Color(0.23921, 0.29803, 0.38431, 1)
 top_color = Color(0.976, 0.776, 0.251, 1)
 
+[node name="Ground5" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(1650, 40)
+size = Vector2(300, 80)
+
 [node name="KillZone" type="Area2D" parent="."]
-position = Vector2(0, 110)
+position = Vector2(300, 110)
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("3_killzone")
 
 [node name="Visual" type="Polygon2D" parent="KillZone"]
-polygon = PackedVector2Array(-1400, -30, 1400, -30, 1400, 30, -1400, 30)
+polygon = PackedVector2Array(-1600, -30, 1600, -30, 1600, 30, -1600, 30)
 color = Color(0.85098, 0.23529, 0.29019, 0.16)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="KillZone"]
@@ -98,70 +102,70 @@ shape = SubResource("RectangleShape2D_kill")
 [node name="Coins" type="Node2D" parent="."]
 
 [node name="Coin1" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(-1160, -50)
+position = Vector2(-1100, -40)
 
 [node name="Coin2" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(-980, -50)
+position = Vector2(-900, -40)
 
 [node name="Coin3" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(-680, -260)
+position = Vector2(-630, -260)
 
 [node name="Coin4" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(-480, -50)
+position = Vector2(-330, -40)
 
 [node name="Coin5" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(-300, -50)
+position = Vector2(-70, -300)
 
 [node name="Coin6" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(-160, -390)
+position = Vector2(280, -40)
 
 [node name="Coin7" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(0, -50)
+position = Vector2(630, -280)
 
 [node name="Coin8" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(150, -50)
+position = Vector2(980, -40)
 
 [node name="Coin9" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(300, -50)
+position = Vector2(1340, -320)
 
 [node name="Coin10" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(460, -260)
+position = Vector2(1650, -40)
 
 [node name="Coin11" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(870, -450)
+position = Vector2(1230, -180)
 
 [node name="Coin12" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(1000, -50)
+position = Vector2(1750, -40)
 
 [node name="Checkpoints" type="Node2D" parent="."]
 
 [node name="CheckpointA" parent="Checkpoints" instance=ExtResource("5_checkpoint")]
-position = Vector2(-980, 0)
+position = Vector2(-1000, 0)
 
 [node name="CheckpointB" parent="Checkpoints" instance=ExtResource("5_checkpoint")]
-position = Vector2(880, 0)
+position = Vector2(980, 0)
 
 [node name="Enemies" type="Node2D" parent="."]
 
 [node name="Slime1" parent="Enemies" instance=ExtResource("6_slime")]
-position = Vector2(-900, -16)
-patrol_left = -140.0
-patrol_right = 140.0
+position = Vector2(-1000, -16)
+patrol_left = -150.0
+patrol_right = 150.0
 
 [node name="Slime2" parent="Enemies" instance=ExtResource("6_slime")]
-position = Vector2(-430, -16)
-patrol_left = -120.0
-patrol_right = 120.0
+position = Vector2(-330, -16)
+patrol_left = -100.0
+patrol_right = 100.0
 
 [node name="Slime3" parent="Enemies" instance=ExtResource("6_slime")]
-position = Vector2(150, -16)
+position = Vector2(280, -16)
 patrol_left = -150.0
 patrol_right = 150.0
 
 [node name="Slime4" parent="Enemies" instance=ExtResource("6_slime")]
-position = Vector2(880, -16)
-patrol_left = -240.0
-patrol_right = 240.0
+position = Vector2(980, -16)
+patrol_left = -150.0
+patrol_right = 150.0
 
 [node name="Player" parent="." instance=ExtResource("7_player")]
 position = Vector2(-1080, -60)

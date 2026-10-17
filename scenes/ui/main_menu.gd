@@ -2,8 +2,14 @@ class_name MainMenu
 extends Control
 ## Menu principal -- ponto de entrada do jogo (cena principal do projeto).
 
-const LEVEL_SCENE := "res://scenes/levels/level_01.tscn"
 const OPTIONS_SCENE := "res://scenes/ui/options_panel.tscn"
+
+## Rotulos das fases, na ordem em que aparecem no menu. O indice bate com
+## a ordem de registro do [LevelRegistry].
+const LEVEL_LABELS := {
+	&"level_01": "1 - Corredores",
+	&"level_02": "2 - Torres",
+}
 
 @onready var _play: Button = %PlayButton
 @onready var _continue: Button = %ContinueButton
@@ -11,8 +17,10 @@ const OPTIONS_SCENE := "res://scenes/ui/options_panel.tscn"
 @onready var _quit: Button = %QuitButton
 @onready var _version: Label = %VersionLabel
 @onready var _save_hint: Label = %SaveHintLabel
+@onready var _level_list: VBoxContainer = %LevelList
 
 var _options_panel: OptionsPanel = null
+var _level_buttons: Array[Button] = []
 
 
 func _ready() -> void:
@@ -23,10 +31,55 @@ func _ready() -> void:
 
 	_quit.visible = not OS.has_feature("web")
 	_refresh_save_state()
+	_build_level_list()
 	_version.text = "Godot %s" % Engine.get_version_info()["string"]
 
 	_play.grab_focus()
 	Music.play()
+
+
+## Monta um botao por fase registrada. Vem do [LevelRegistry] em vez de
+## lista fixa aqui: adicionar uma fase e uma linha no SceneRouter.
+##
+## Nao ha trava de progresso ainda -- um slot por fase com "desbloqueada" so
+## faz sentido quando existir save por slot (Fase 2.1). O que ja tem e o
+## marcador de onde o jogador parou, que vem do save real.
+func _build_level_list() -> void:
+	for child in _level_list.get_children():
+		child.queue_free()
+	_level_buttons.clear()
+
+	# `peek_level_id` devolve vazio quando o save aponta para uma fase que
+	# sumiu -- e nesse caso nao ha "(continuar)" para marcar.
+	var last_played := Save.peek_level_id()
+	var resumed := Save.has_save() and last_played != &""
+
+	for id: StringName in LevelRegistry.all_ids():
+		if id == &"main_menu":
+			continue
+		var path := LevelRegistry.path_for(id)
+		if path == "" or not ResourceLoader.exists(path):
+			continue
+
+		var label: String = LEVEL_LABELS.get(id, String(id))
+		if resumed and id == last_played:
+			label += "  (continuar)"
+
+		var button := Button.new()
+		button.text = label
+		button.custom_minimum_size = Vector2(260, 0)
+		button.pressed.connect(_on_level_pressed.bind(id, path))
+		_level_list.add_child(button)
+		_level_buttons.append(button)
+
+	# Com uma fase só não há o que escolher.
+	_level_list.visible = _level_buttons.size() > 1
+
+
+func _on_level_pressed(id: StringName, path: String) -> void:
+	Sfx.play(&"select")
+	GameState.reset()
+	SceneRouter.goto(path, id)
 
 
 func _refresh_save_state() -> void:
@@ -40,7 +93,10 @@ func _refresh_save_state() -> void:
 func _on_play() -> void:
 	Sfx.play(&"select")
 	GameState.reset()
-	SceneRouter.goto(LEVEL_SCENE, &"level_01")
+	# "Jogar" sempre vai para a primeira fase -- é o botão de início, não um
+	# atalho para a última jogada. Para escolher, use a lista abaixo.
+	var first := LevelRegistry.default_id()
+	SceneRouter.goto(LevelRegistry.path_for(first), first)
 
 
 func _on_continue() -> void:
