@@ -175,11 +175,28 @@ jogando.
 
 ---
 
+## Onda 3 -- **pronta**
+
+Editor visual de layout, mais inimigos e mais fases. As tres entraram.
+
+| Item | O que foi | Onde |
+|---|---|---|
+| Editor de layout | `tools/preview_level.gd`: desenha o arco do pulo a partir de cada plataforma, com marcador verde/vermelho no ponto final | `tools/preview_level.gd` |
+| Escorre | Anda rapido, ignora a borda e cai; a rede de seguranca (`_guard_offscreen`) o traz de volta | `scenes/actors/enemies/crawler.gd` |
+| Explosivo | Ao morrer, danifica o jogador num raio de 110 px por caminho direto (sem `Hitbox`) | `scenes/actors/enemies/bomber.gd` |
+| Guarda | Nao patrulha: fica no posto e so persegue se o jogador entrar no raio | `scenes/actors/enemies/guard.gd` |
+| Fase 3 | Variacao da fase 1 com os tres inimigos novos | `scenes/levels/level_03.tscn` |
+
+**Verificacao.** 411 checagens no testador (era 399): 3 suites novas para os
+inimigos, mais a fase 3 nos testes de balistica e de "inimigos nao caem",
+mais os smoke tests das tres cenas.
+
+---
+
 ## Ondas seguintes
 
 ```
 Onda 2  stats de sessao -> save por slot/hub -> mais verbos de combate
-Onda 3  editor de layout -> mais inimigos -> mais fases
 ```
 
 O principio que organiza continua o mesmo: **cada onda faz o jogo parecer mais

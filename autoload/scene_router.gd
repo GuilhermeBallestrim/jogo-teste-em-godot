@@ -41,6 +41,7 @@ func _register_levels() -> void:
 	LevelRegistry.register(&"main_menu", "res://scenes/ui/main_menu.tscn")
 	LevelRegistry.register(&"level_01", "res://scenes/levels/level_01.tscn")
 	LevelRegistry.register(&"level_02", "res://scenes/levels/level_02.tscn")
+	LevelRegistry.register(&"level_03", "res://scenes/levels/level_03.tscn")
 
 
 func _notification(what: int) -> void:

@@ -1,24 +1,31 @@
 # Plano de evolução
 
 Roadmap de features depois da Fase 2. Nao e promessa -- e ordem sugerida com o
+motivo de cada passo e como verificar que ficou bom.
+
+Tamanhos sao relativos: **P** = um dia de trabalho, **M** = dois ou tres,
+**G** = uma semana. Nao sao estimativas de calendario: dependem de quantas
+horas voce quer investir por semana.
 
 ## Status
 
-**Onda 1 (o jogo acorda) esta pronta.** Camera com antecipacao,
-hitstop, numero de dano, tremor escalado com o dano, poeira, respingo,
-rastro do dash e estouro na morte do inimigo. Tres coisas mudaram de
-ideia no meio do caminho -- ver `docs/roadmap.md` secao "Onda 1".
+**Onda 1 (o jogo acorda) esta pronta.** Camera com antecipacao, hitstop,
+numero de dano, tremor escalado com o dano, poeira, respingo, rastro do dash
+e estouro na morte do inimigo. Tres coisas mudaram de ideia no meio do
+caminho -- ver `docs/roadmap.md` secao "Onda 1".
 
-Onda 2 (stats, slots, mais verbos) e Onda 3 (editor de layout, mais
-inimigos, mais fases) continuam pendentes.
+**Onda 3 (duracao de conteudo) esta pronta.** Editor de layout, escorre,
+explosivo, guarda e fase 3.
 
-motivo de cada passo e como verificar que ficou bom.
+Onda 2 (stats, slots, mais verbos) continua pendente.
+
+---
+
 
 Tamanhos são relativos: **P** = um dia de trabalho, **M** = dois ou três,
 **G** = uma semana. Não são estimativas de calendário: dependem de quantas
 horas você quer investir por semana.
 
----
 
 ## A regra que organiza tudo
 
@@ -156,11 +163,11 @@ vida). É a mesma infraestrutura do teste de dano que já existe.
 
 ---
 
-## Onda 3 — Duração de conteúdo
+## Onda 3 - Duracao de conteudo - **pronta**
 
 **Só entre aqui se você decidir que o problema é ter pouco conteúdo.**
 
-### I. Editor visual de layout — **M** — antes de J e K
+### I. Editor visual de layout - **feito**
 
 **Por quê.** Hoje o teste de balística diz *se* um layout funciona, não *como
 consertar*. Uma ferramenta que desenha o arco do pulo sobre a fase converte
@@ -172,7 +179,7 @@ janela, desenha o arco de cada salto possível a partir de cada plataforma.
 
 **Verificar.** Não precisa de teste. Precisa existir e ser usada.
 
-### J. Mais inimigos — **M** por inimigo
+### J. Mais inimigos - **feito**
 
 **Por quê.** A arquitetura já provou que aceita variação: `bat` (voa),
 `archer` (atira), `slime` (pula). Cada novo é ~20 linhas sobrescrevendo
@@ -191,7 +198,7 @@ janela, desenha o arco de cada salto possível a partir de cada plataforma.
 **Verificar.** Uma suíte de FSM por inimigo, como as três existentes. O
 `EnemyArena` já monta tudo.
 
-### K. Mais fases — **P** por fase, com layout de dia
+### K. Mais fases - **feito**
 
 **Por quê.** A `LevelBase` + `LevelRegistry` já suportam quantas você quiser.
 Adicionar uma fase hoje é: um `.tscn`, um `.gd` de 8 linhas, uma linha no

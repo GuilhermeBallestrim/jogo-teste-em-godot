@@ -16,10 +16,14 @@ const SCENES := [
 	"res://scenes/ui/end_screen.tscn",
 	"res://scenes/levels/level_01.tscn",
 	"res://scenes/levels/level_02.tscn",
+	"res://scenes/levels/level_03.tscn",
 	"res://scenes/actors/player/player.tscn",
 	"res://scenes/actors/enemies/slime.tscn",
 	"res://scenes/actors/enemies/bat.tscn",
 	"res://scenes/actors/enemies/archer.tscn",
+	"res://scenes/actors/enemies/crawler.tscn",
+	"res://scenes/actors/enemies/bomber.tscn",
+	"res://scenes/actors/enemies/guard.tscn",
 	"res://scenes/props/projectile.tscn",
 	"res://scenes/props/coin.tscn",
 	"res://scenes/props/checkpoint.tscn",
@@ -801,10 +805,16 @@ func _test_enemy_fsm() -> void:
 	await _test_enemy_death()
 	await _test_flying_enemy()
 	await _test_ranged_enemy()
+	await _test_crawler_enemy()
+	await _test_bomber_explosion()
+	await _test_guard_stands_post()
 
 
 const BAT_SCENE := "res://scenes/actors/enemies/bat.tscn"
 const ARCHER_SCENE := "res://scenes/actors/enemies/archer.tscn"
+const CRAWLER_SCENE := "res://scenes/actors/enemies/crawler.tscn"
+const BOMBER_SCENE := "res://scenes/actors/enemies/bomber.tscn"
+const GUARD_SCENE := "res://scenes/actors/enemies/guard.tscn"
 
 
 ## Voador: a prova de que a arquitetura aceita variacao. Se o [Enemy]
@@ -1786,6 +1796,102 @@ func _spawn_all_scenes() -> void:
 		_spawned.append(instance)
 
 
+## Escorre: cai e a rede de seguranca o traz de volta.
+##
+## O caminho de recuperacao (`_guard_offscreen`) so era exercitado por
+## knockback forte antes. O escorre exercita-o de proposito: anda ate a borda,
+## cai, e volta para casa em vez de morrer em silencio.
+func _test_crawler_enemy() -> void:
+	_begin("Enemy: escorre (cai e recupera)")
+
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(false, CRAWLER_SCENE)
+	await process_frame
+
+	var home := arena.enemy.global_position
+	# Empurra para baixo do limite de queda.
+	arena.enemy.global_position = home + Vector2(0, 400)
+	arena.enemy.velocity = Vector2.ZERO
+
+	for _i in 5:
+		await physics_frame
+	_check(
+		arena.enemy.global_position.distance_to(home) < 5.0,
+		"rede de seguranca trouxe o escorre de volta (%.1f px)" % arena.enemy.global_position.distance_to(home)
+	)
+
+	arena.dispose()
+	await process_frame
+
+
+## Explosivo: ao morrer, danifica o jogador colado.
+##
+## O dano nao vem de `Hitbox`. E o caminho de dano que nao passa por hitbox,
+## e o que o teste existe para provar.
+func _test_bomber_explosion() -> void:
+	_begin("Enemy: explosivo (dano radial)")
+
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(true, BOMBER_SCENE)
+	await process_frame
+
+	arena.enemy.global_position = Vector2(0, 0)
+	arena.player.global_position = Vector2(40, 0)
+	await process_frame
+
+	var health_before: int = int(_gs.get(&"health"))
+	arena.enemy.call(&"apply_damage", 99, arena.player, Vector2.RIGHT, 0.0)
+
+	# O hitstop congela o relogio, entao `physics_frame` nao avanca o tempo
+	# de jogo. Basta um quadro: o dano e aplicado sincrono em `_die`.
+	await physics_frame
+	_check(
+		int(_gs.get(&"health")) < health_before,
+		"jogador colado levou dano radial (%d -> %d)" % [health_before, int(_gs.get(&"health"))]
+	)
+
+	# Quem esta longe nao leva.
+	var far_arena := EnemyArena.new()
+	root.add_child(far_arena)
+	far_arena.build(true, BOMBER_SCENE)
+	await process_frame
+	far_arena.enemy.global_position = Vector2(0, 0)
+	far_arena.player.global_position = Vector2(400, 0)
+	await process_frame
+	var health_far_before: int = int(_gs.get(&"health"))
+	far_arena.enemy.call(&"apply_damage", 99, far_arena.player, Vector2.RIGHT, 0.0)
+	await physics_frame
+	_check(
+		int(_gs.get(&"health")) == health_far_before,
+		"jogador longe nao levou dano radial"
+	)
+
+	arena.dispose()
+	far_arena.dispose()
+	await process_frame
+
+
+## Guarda: nao abandona o posto sem jogador por perto.
+func _test_guard_stands_post() -> void:
+	_begin("Enemy: guarda (fica no posto)")
+
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(false, GUARD_SCENE)
+	await process_frame
+
+	var start_x: float = arena.enemy.global_position.x
+	for _i in 60:
+		await physics_frame
+	_check(
+		absf(arena.enemy.global_position.x - start_x) < 8.0,
+		"guarda nao abandona o posto sem jogador (%.1f px)" % absf(arena.enemy.global_position.x - start_x)
+	)
+
+	arena.dispose()
+	await process_frame
 func _free_all_scenes() -> void:
 	for node in _spawned:
 		if is_instance_valid(node):
