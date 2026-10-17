@@ -88,7 +88,7 @@ func effect_hint() -> String:
 		Effect.BOMB:
 			return "Dano radial"
 		Effect.SHIELD:
-			return "Invulneravel por 3s"
+			return "Invulnerável por 3s"
 		Effect.MAGNET:
 			return "Atrai moedas"
 	return ""

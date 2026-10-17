@@ -196,7 +196,7 @@ func _on_continue() -> void:
 	# cai na fase padrao nesse caso, mas avisamos em vez de fingir que
 	# retomou o progresso.
 	if Save.last_scene_missing():
-		_save_hint.text = "Progresso salvo de uma fase que nao existe mais"
+		_save_hint.text = "Progresso salvo de uma fase que não existe mais"
 		_save_hint.add_theme_color_override("font_color", Color(0.949, 0.361, 0.361))
 		_save_hint.visible = true
 

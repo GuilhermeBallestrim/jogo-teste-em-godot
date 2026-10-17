@@ -7,7 +7,7 @@ extends RefCounted
 ## cada entrada ganha `icon` e o resto do jogo não muda — ele sempre pede o
 ## item pelo `id`.
 ##
-##     ItemLibrary.definition(&"potion").display_name  -> "Pocao"
+##     ItemLibrary.definition(&"potion").display_name  -> "Poção"
 
 static var _items: Dictionary = {}
 static var _ready := false
@@ -19,7 +19,7 @@ static func _build() -> void:
 	_ready = true
 
 	_add(&"potion", func(d: ItemDefinition) -> void:
-		d.display_name = "Pocao"
+		d.display_name = "Poção"
 		d.tint = Color(0.929, 0.325, 0.361)
 		d.value = 50
 		d.effect = ItemDefinition.Effect.HEAL
@@ -53,7 +53,7 @@ static func _build() -> void:
 	)
 
 	_add(&"magnet", func(d: ItemDefinition) -> void:
-		d.display_name = "Ima"
+		d.display_name = "Ímã"
 		d.tint = Color(0.9, 0.4, 0.9)
 		d.value = 0
 		d.effect = ItemDefinition.Effect.MAGNET

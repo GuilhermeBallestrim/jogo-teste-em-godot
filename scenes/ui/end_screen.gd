@@ -46,11 +46,11 @@ func _ready() -> void:
 	if is_victory:
 		_title.text = "VITORIA!"
 		_title.add_theme_color_override("font_color", Color(0.376, 0.878, 0.612))
-		_subtitle.text = "Voce coletou todas as moedas."
+		_subtitle.text = "Você coletou todas as moedas."
 	else:
 		_title.text = "FIM DE JOGO"
 		_title.add_theme_color_override("font_color", Color(0.949, 0.361, 0.361))
-		_subtitle.text = "Voce perdeu todas as vidas."
+		_subtitle.text = "Você perdeu todas as vidas."
 
 	GameState.coins_changed.connect(_on_coins_changed)
 	GameState.score_changed.connect(_on_score_changed)

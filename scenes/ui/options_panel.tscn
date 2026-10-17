@@ -36,7 +36,7 @@ theme_override_constants/separation = 14
 [node name="Title" type="Label" parent="Center/Panel/Margin/Column"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 26
-text = "Opcoes"
+text = "Opções"
 horizontal_alignment = 1
 
 [node name="Tabs" type="TabContainer" parent="Center/Panel/Margin/Column"]
@@ -59,7 +59,7 @@ theme_override_constants/separation = 14
 [node name="Label" type="Label" parent="Center/Panel/Margin/Column/Tabs/Geral/MusicRow"]
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
-text = "Musica"
+text = "Música"
 
 [node name="MusicSlider" type="HSlider" parent="Center/Panel/Margin/Column/Tabs/Geral/MusicRow"]
 unique_name_in_owner = true
@@ -130,7 +130,7 @@ theme_override_constants/separation = 14
 [node name="Label" type="Label" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade"]
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-text = "Tremor de camera"
+text = "Tremor de câmera"
 
 [node name="ShakeSlider" type="HSlider" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade"]
 unique_name_in_owner = true
@@ -155,7 +155,7 @@ text = "Alto contraste (clareia a cena)"
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.6, 0.66, 0.74, 1)
-text = "O alto contraste clareia tudo, inclusive o cenario escuro. Ajuda a enxergar o personagem em fundo escuro."
+text = "O alto contraste clareia tudo, inclusive o cenário escuro. Ajuda a enxergar o personagem em fundo escuro."
 autowrap_mode = 3
 
 [node name="Controles" type="VBoxContainer" parent="Center/Panel/Margin/Column/Tabs"]
@@ -178,7 +178,7 @@ text = ""
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
-text = "Restaurar controles padrao"
+text = "Restaurar controles padrão"
 
 [node name="CloseButton" type="Button" parent="Center/Panel/Margin/Column"]
 unique_name_in_owner = true
