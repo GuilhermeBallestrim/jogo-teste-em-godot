@@ -193,6 +193,20 @@ mais os smoke tests das tres cenas.
 
 ---
 
+## Onda 4 -- **plano**
+
+Tudo o que sobrou depois da Onda 3: teste de input real, boss, tela de fim
+animada, habilidades, hub, mais niveis, mais inimigos, mais itens, mais
+particulas, transicoes e musica variavel. Detalhamento em
+[plano-onda-4.md](plano-onda-4.md).
+
+`
+Onda 4  input real -> boss -> tela de fim animada
+Onda 5  habilidades -> hub -> niveis
+Onda 6  inimigos -> itens -> particulas -> transicoes -> musica
+`
+
+---
 ## Ondas seguintes
 
 ```
