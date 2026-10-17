@@ -18,7 +18,7 @@ size = Vector2(3200, 60)
 
 [node name="Level02" type="Node2D"]
 script = ExtResource("1_level")
-coins_to_win = 11
+coins_to_win = 10
 
 [node name="Background" type="CanvasLayer" parent="."]
 layer = -10
