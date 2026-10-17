@@ -40,6 +40,8 @@ const HEAVY_ACTIVE_TIME := 0.22
 const AIR_ATTACK_DAMAGE := 2
 const AIR_ATTACK_ACTIVE_TIME := 0.16
 const PARRY_WINDOW := 0.18
+## Velocidade maxima de queda durante a planagem.
+const GLIDE_FALL_SPEED := 130.0
 const IFRAME_TIME := PlayerTuning.IFRAME_TIME
 const HURT_KNOCKBACK := PlayerTuning.HURT_KNOCKBACK
 const DEFAULT_GRAVITY := PlayerTuning.DEFAULT_GRAVITY
@@ -140,6 +142,7 @@ func _physics_process(delta: float) -> void:
 			_process_ground_air(delta, input_dir)
 			_process_jump()
 			velocity.y += _step_gravity(delta) * gravity_scale
+			_apply_glide(delta)
 
 	move_and_slide()
 	_update_facing(input_dir)
@@ -203,6 +206,20 @@ func is_dashing() -> bool:
 
 
 # ------------------------------------------------------------- movimento
+
+
+## Planagem: segurar o pulo no ar desacelera a queda.
+##
+## So vale com a habilidade desbloqueada, com o corpo caindo e com o botao
+## de pulo pressionado. Sem a habilidade, o comportamento e o de sempre.
+func _apply_glide(delta: float) -> void:
+	if not GameState.has_ability(&"glide"):
+		return
+	if is_on_floor() or velocity.y <= 0.0:
+		return
+	if not Input.is_action_pressed(&"jump"):
+		return
+	velocity.y = minf(velocity.y, GLIDE_FALL_SPEED)
 
 
 func _process_ground_air(delta: float, input_dir: Vector2) -> void:

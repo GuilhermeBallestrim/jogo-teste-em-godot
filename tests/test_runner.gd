@@ -189,6 +189,7 @@ func _run_unit_tests() -> void:
 	await _test_menu_lists_every_level()
 	await _test_player_rig_poses()
 	await _test_parry()
+	await _test_glide()
 	_test_session_stats()
 	_test_abilities()
 	await _test_camera_look()
@@ -2027,6 +2028,7 @@ func _test_boss() -> void:
 func _test_abilities() -> void:
 	_begin("GameState: habilidades e niveis")
 
+	_gs.call(&"reset_progress")
 	_gs.call(&"reset")
 	_check(not _gs.call(&"has_ability", &"double_jump"), "comeca sem habilidades")
 	_check(_gs.call(&"unlock_ability", &"double_jump"), "desbloqueia habilidade nova")
@@ -2050,6 +2052,35 @@ func _test_abilities() -> void:
 	_check(_gs.call(&"is_level_completed", &"level_01"), "nivel completo sobrevive ao save")
 
 
+func _test_glide() -> void:
+	_begin("Player: planagem")
+
+	# Sem a habilidade, a queda nao e limitada.
+	_gs.call(&"reset_progress")
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(true, SLIME_SCENE)
+	await process_frame
+	arena.player.global_position = Vector2(0, -300)
+	arena.player.velocity = Vector2(0, 500)
+	Input.action_press(&"jump")
+	await physics_frame
+	await physics_frame
+	var fall_speed: float = arena.player.velocity.y
+	_check(fall_speed > 500.0, "sem habilidade a queda acelera (%.0f px/s)" % fall_speed)
+
+	# Com a habilidade, segurar o pulo limita a queda.
+	_gs.call(&"unlock_ability", &"glide")
+	arena.player.global_position = Vector2(0, -300)
+	arena.player.velocity = Vector2(0, 500)
+	await physics_frame
+	await physics_frame
+	var glide_speed: float = arena.player.velocity.y
+	_check(glide_speed <= 150.0, "com habilidade a queda e limitada (%.0f px/s)" % glide_speed)
+
+	Input.action_release(&"jump")
+	arena.dispose()
+	await process_frame
 func _free_all_scenes() -> void:
 	for node in _spawned:
 		if is_instance_valid(node):
