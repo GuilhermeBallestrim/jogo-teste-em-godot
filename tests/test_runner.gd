@@ -29,6 +29,8 @@ var _failures: PackedStringArray = []
 var _phase := 0
 var _spawned: Array[Node] = []
 var _unit_done := false
+var _suite_start := 0
+var _empty_suites := PackedStringArray()
 
 ## No modo `--script` os autoloads ainda nao viraram identificadores globais
 ## quando o script e compilado, entao resolvemos pela arvore.
@@ -58,6 +60,18 @@ func _process(_delta: float) -> bool:
 
 func _report() -> void:
 	print("")
+	# Rede de seguranca: uma suite que quebra em tempo de execucao (metodo
+	# inexistente, tipo errado) aborta antes de registrar qualquer checagem, e
+	# o runner reporta "PASSARAM" com zero verificacoes. Exigimos que cada
+	# suite registrada tenha produzido ao menos uma checagem.
+	if _empty_suites.size() > 0:
+		printerr("  suites sem nenhuma verificacao: %s" % ", ".join(_empty_suites))
+		_failed += _empty_suites.size()
+		_failures.append(
+			"Suite sem verificacoes: %s -- provavelmente lancou excecao antes do primeiro check"
+			% ", ".join(_empty_suites)
+		)
+
 	if _failed == 0:
 		print("  %d verificacoes OK" % _passed)
 		print("TESTES: PASSARAM")
@@ -75,7 +89,13 @@ func _report() -> void:
 
 
 func _begin(suite: String) -> void:
+	# Fecha a suite anterior: se ela nao registrou nenhuma checagem, ou
+	# explodiu no meio -- ambos sao falhas silenciosas.
+	if _suite != "" and _passed + _failed == _suite_start:
+		_empty_suites.append(_suite)
+
 	_suite = suite
+	_suite_start = _passed + _failed
 	print("-- %s" % suite)
 
 
@@ -114,6 +134,7 @@ func _run_unit_tests() -> void:
 	_test_sfx()
 	_test_music()
 	await _test_player_physics()
+	await _test_enemy_fsm()
 	_unit_done = true
 
 
@@ -420,6 +441,217 @@ func _test_player_physics() -> void:
 
 	holder.queue_free()
 	await physics_frame
+
+
+# ------------------------------------------------- comportamento do Enemy
+#
+# O Enemy e o sistema mais complexo do projeto (6 estados, 3 transicoes
+# condicionais, deteccao por raycast) e antes these nao tinha NENHUM teste de
+# comportamento -- so instanciacao. Estas suites exercitam as transicoes de
+# verdade, com arena isolada.
+
+
+func _test_enemy_fsm() -> void:
+	await _test_enemy_patrol()
+	await _test_enemy_detects_player()
+	await _test_enemy_line_of_sight()
+	await _test_enemy_attack_and_damage()
+	await _test_enemy_death()
+
+
+## Estados do Enemy, por indice do enum.State. Nominais evitam magic number
+## espalhado no teste -- se a ordem mudar no enum, o teste avisa.
+const E_IDLE := 0
+const E_PATROL := 1
+const E_CHASE := 2
+const E_ATTACK := 3
+const E_STAGGER := 4
+const E_DEAD := 5
+
+
+## Sem player na cena, o slime fica entre PATROL e IDLE e nunca persegue.
+func _test_enemy_patrol() -> void:
+	_begin("Enemy: patrulha sem alvo")
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(false)
+	arena.enemy.global_position = Vector2(0, -20)
+	# Patrulha larga para ele ter o que percorrer.
+	arena.enemy.patrol_left = -200.0
+	arena.enemy.patrol_right = 200.0
+
+	await arena.settle(30)
+	_check(arena.enemy.is_on_floor(), "slime assentou no chao")
+
+	var start_x: float = arena.enemy.global_position.x
+	var seen := {}
+	for _i in 300:
+		await physics_frame
+		seen[arena.enemy.state] = true
+
+	_check(
+		not seen.has(E_CHASE),
+		"nunca entrou em CHASE sem player na cena (estados: %s)" % str(seen.keys())
+	)
+	_check(
+		seen.has(E_PATROL) or seen.has(E_IDLE),
+		"ficou no ciclo IDLE/PATROL (estados: %s)" % str(seen.keys())
+	)
+
+	var moved: float = absf(arena.enemy.global_position.x - start_x)
+	_check(moved > 20.0, "andei durante a patrulha (%.1f px)" % moved)
+
+	arena.dispose()
+
+
+## Player dentro de detect_range e sem parede: deve entrar em CHASE e aproximar.
+func _test_enemy_detects_player() -> void:
+	_begin("Enemy: detecta o jogador")
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(true)
+	arena.player.global_position = Vector2(0, -60)
+	arena.enemy.global_position = Vector2(220, -20)
+	arena.enemy.detect_range = 300.0
+	arena.enemy.forget_range = 700.0
+
+	await arena.settle(20)
+	_check(arena.enemy.state != E_CHASE, "comeca longe, sem perseguir ainda")
+
+	var chased := await arena.wait_for_state([E_CHASE], 120)
+	_check(chased, "entrou em CHASE com o jogador a 220 px (estado=%d)" % arena.enemy.state)
+
+	var before: float = absf(arena.player.global_position.x - arena.enemy.global_position.x)
+	for _i in 30:
+		await physics_frame
+	var after: float = absf(arena.player.global_position.x - arena.enemy.global_position.x)
+	_check(after < before, "aproximou do jogador (%.0f -> %.0f px)" % [before, after])
+
+	arena.dispose()
+
+
+## Parede entre os dois: o raycast bloqueia e o slime NAO deve perseguir.
+## Esta e a suite que garante que o inimigo nao "enxerga" atraves de
+## geometria -- o comportamento mais irritante de um jogo de plataforma.
+func _test_enemy_line_of_sight() -> void:
+	_begin("Enemy: linha de visao")
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(true)
+	arena.player.global_position = Vector2(0, -60)
+	arena.enemy.global_position = Vector2(260, -20)
+	arena.enemy.detect_range = 500.0
+	arena.add_wall(130.0)
+
+	await arena.settle(20)
+
+	var chased := await arena.wait_for_state([E_CHASE], 150)
+	_check(
+		not chased,
+		"NAO entrou em CHASE com parede no meio (estado=%d)" % arena.enemy.state
+	)
+
+	# Sem CHASE, ele tem que continuar patrulhando normalmente.
+	var patrolled := false
+	for _i in 180:
+		await physics_frame
+		if arena.enemy.state in [E_PATROL, E_IDLE]:
+			patrolled = true
+			break
+	_check(patrolled, "continua patrulhando em vez de ficar travado")
+
+	arena.dispose()
+
+
+## Perto o suficiente: ataca, o dano chega ao player, e o ciclo se recupera.
+func _test_enemy_attack_and_damage() -> void:
+	_begin("Enemy: ataque causa dano")
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(true)
+	# Colados: a hitbox do slime fica 26 px a FRENTE do corpo, entao o que
+	# encosta na hurtbox do player (raio 20) e o centro dela, nao o slime.
+	arena.player.global_position = Vector2(0, -60)
+	arena.enemy.global_position = Vector2(10, -20)
+	arena.enemy.attack_range = 60.0
+	arena.enemy.chase_speed = 300.0
+	# O player mata o slime se o combate durar: ele tem 3 de vida e o golpe
+	# tira 1. Sem i-frames, dois acertos ja matam e o node e liberado no meio
+	# da suite.
+	arena.enemy.max_health = 999
+	arena.enemy.health = 999
+
+	await arena.settle(20)
+	_gs.reset()
+
+	# O teste e sobre a conexao do golpe (hitbox -> hurtbox -> apply_damage),
+	# nao sobre a locomocao do slime. Deixamos a FSM rodar normalmente e
+	# esperamos o ciclo completo passar pelo ATTACK, que liga a hitbox.
+	var start_health: int = _gs.health
+
+	# Nao verificamos passar pelo estado ATTACK: ele dura 0,22s e o slime
+	# pode cruzar entre dois passos, tornando o teste instavel. O que
+	# importa -- hitbox ligar e dano chegar -- e verificado no laco abaixo.
+	await arena.wait_for_state([E_ATTACK], 300)
+
+	var damaged := false
+	var saw_hitbox_active := false
+	for _i in 180:
+		await physics_frame
+		if arena.enemy._hitbox.active:
+			saw_hitbox_active = true
+		if _gs.health < start_health:
+			damaged = true
+			break
+
+	_check(saw_hitbox_active, "a hitbox ficou ativa durante o ataque")
+	_check(damaged, "o golpe tirou vida do player (%d -> %d)" % [start_health, _gs.health])
+
+	var recovered := await arena.wait_for_state([E_CHASE, E_PATROL], 180)
+	_check(recovered, "saiu do ataque para CHASE ou PATROL (estado=%d)" % arena.enemy.state)
+
+	_gs.reset()
+	arena.dispose()
+
+
+## Dano suficiente mata: DEAD, pontua, e ignora dano depois.
+func _test_enemy_death() -> void:
+	_begin("Enemy: morte")
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(false)
+	arena.enemy.global_position = Vector2(0, -20)
+	arena.enemy.max_health = 3
+	arena.enemy.health = 1
+
+	await arena.settle(20)
+
+	# `died` e setado por closure num array: em GDScript atribuir a variavel
+	# local de dentro de um lambda funciona, mas o array evita qualquer
+	# questao de escopo em tempo de execucao.
+	var died := [false]
+	var score_before: int = _gs.score
+	arena.enemy.died.connect(func(_e) -> void: died[0] = true)
+
+	arena.enemy.apply_damage(5, null, Vector2.RIGHT, 100.0)
+	await physics_frame
+
+	_check(arena.enemy.state == E_DEAD, "entrou em DEAD (estado=%d)" % arena.enemy.state)
+	_check(died[0], "emitiu o sinal died")
+	_check(_gs.score > score_before, "somou pontos ao morrer (%d -> %d)" % [score_before, _gs.score])
+	_check(arena.enemy.health <= 0, "vida zerou ou ficou negativa (%d)" % arena.enemy.health)
+	# Inulneravel AO MORRER: e o que impede dano em cadeia com o player
+	# atravessando o corpo no mesmo frame.
+	_check(arena.enemy._hurtbox.invulnerable, "hurtbox ficou invulneravel apos morrer")
+
+	arena.enemy.apply_damage(5, null, Vector2.RIGHT, 100.0)
+	await physics_frame
+	_check(arena.enemy.state == E_DEAD, "ignora dano apos morto")
+	_check(_gs.score == score_before + 50, "nao pontua duas vezes")
+
+	_gs.reset()
+	arena.dispose()
+
 
 
 # ------------------------------------------------- integracao (multi-frame)

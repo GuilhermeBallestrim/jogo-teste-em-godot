@@ -19,7 +19,10 @@ signal hit(hurtbox: Area2D)
 
 
 func _ready() -> void:
-	collision_layer = 0
+	# A camada HITBOX e o que torna a hitbox visivel para as hurtboxes, que
+	# monitoram esta camada. Com `layer = 0` ela nunca era detectada e NENHUM
+	# golpe conectava -- nem do player, nem dos inimigos.
+	collision_layer = Layers.HITBOX
 	collision_mask = 0
 	monitoring = false
 	monitorable = active
