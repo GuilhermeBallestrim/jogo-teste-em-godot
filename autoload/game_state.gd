@@ -20,6 +20,10 @@ var _flags: Dictionary = {}
 ## uma pergunta que se responde em O(1) e que o save precisa restaurar sem
 ## deduplicar.
 var _items: Dictionary = {}
+## Habilidades desbloqueadas (ids).
+var _abilities: Array[StringName] = []
+## Niveis completados.
+var _completed_levels: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -33,6 +37,8 @@ func reset() -> void:
 	score = 0
 	_flags.clear()
 	_items.clear()
+	_abilities.clear()
+	_completed_levels.clear()
 	_notify_all()
 
 
@@ -106,9 +112,9 @@ func has_item(id: StringName, amount: int = 1) -> bool:
 	return item_count(id) >= amount
 
 
-## O primeiro item com efeito, na ordem do catálogo. É o que a tecla de uso
-## consome: o jogador não precisa de um menu de inventário para uma fase com
-## um item só, e o menu ainda não existe.
+## O primeiro item com efeito, na ordem do catalogo. E o que a tecla de uso
+## consome: o jogador nao precisa de um menu de inventario para uma fase com
+## um item so, e o menu ainda nao existe.
 func first_usable_id() -> StringName:
 	for id: StringName in ItemLibrary.all_ids():
 		if item_count(id) > 0:
@@ -137,6 +143,59 @@ func is_alive() -> bool:
 	return health > 0
 
 
+# ------------------------------------------------------------- habilidades
+
+
+## Desbloqueia uma habilidade. Devolve false se ja tinha ou se nao existe.
+func unlock_ability(id: StringName) -> bool:
+	if not AbilityLibrary.has(id) or has_ability(id):
+		return false
+	_abilities.append(id)
+	return true
+
+
+func has_ability(id: StringName) -> bool:
+	return _abilities.has(id)
+
+
+func all_abilities() -> Array[StringName]:
+	return _abilities.duplicate()
+
+
+func complete_level(id: StringName) -> void:
+	if not _completed_levels.has(id):
+		_completed_levels.append(id)
+
+
+func is_level_completed(id: StringName) -> bool:
+	return _completed_levels.has(id)
+
+
+func is_level_unlocked(id: StringName) -> bool:
+	if id == &"level_01":
+		return true
+	var prev := _previous_level(id)
+	if prev == &"":
+		return true
+	return is_level_completed(prev)
+
+
+func _previous_level(id: StringName) -> StringName:
+	var s := String(id)
+	if not s.begins_with("level_"):
+		return &""
+	var num_str := s.substr(6)
+	if not num_str.is_valid_int():
+		return &""
+	var n := int(num_str)
+	if n <= 1:
+		return &""
+	return StringName("level_%02d" % (n - 1))
+
+
+# ------------------------------------------------------------- save
+
+
 func to_dict() -> Dictionary:
 	return {
 		"max_health": max_health,
@@ -145,6 +204,8 @@ func to_dict() -> Dictionary:
 		"score": score,
 		"flags": _flags.duplicate(true),
 		"items": _items.duplicate(),
+		"abilities": _abilities.duplicate(),
+		"completed_levels": _completed_levels.duplicate(),
 	}
 
 
@@ -165,6 +226,24 @@ func from_dict(data: Dictionary) -> void:
 			if not ItemLibrary.has(id):
 				continue
 			_items[id] = clampi(int(saved[key]), 0, 99)
+
+	# Habilidades: so aceita as que existem no catalogo.
+	_abilities = []
+	var saved_abilities: Variant = data.get("abilities", [])
+	if saved_abilities is Array:
+		for a in saved_abilities:
+			var aid := StringName(String(a))
+			if AbilityLibrary.has(aid) and not _abilities.has(aid):
+				_abilities.append(aid)
+
+	# Niveis completados.
+	_completed_levels = []
+	var saved_levels: Variant = data.get("completed_levels", [])
+	if saved_levels is Array:
+		for lv in saved_levels:
+			var lid := StringName(String(lv))
+			if not _completed_levels.has(lid):
+				_completed_levels.append(lid)
 
 	_notify_all()
 

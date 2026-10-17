@@ -154,6 +154,15 @@ func _level_id() -> StringName:
 	return StringName(scene_file_path.get_file().get_basename())
 
 
+## Desbloqueia a proxima habilidade disponivel, se houver.
+func _unlock_next_ability() -> void:
+	for id: StringName in AbilityLibrary.all_ids():
+		if not GameState.has_ability(id):
+			GameState.unlock_ability(id)
+			notify("Habilidade desbloqueada: %s" % AbilityLibrary.definition(id).display_name)
+			return
+
+
 func _win() -> void:
 	if is_finished:
 		return
@@ -163,6 +172,9 @@ func _win() -> void:
 	if _stats != null:
 		_stats.finish(true)
 		_stats.coins_collected = GameState.coins - _coins_at_start
+	GameState.complete_level(_level_id())
+	# Desbloqueia a proxima habilidade da lista.
+	_unlock_next_ability()
 	_show_end_screen(true)
 
 

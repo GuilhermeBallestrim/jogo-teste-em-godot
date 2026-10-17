@@ -56,6 +56,7 @@ const DUST_SPEED := 120.0
 
 var _coyote_timer := 0.0
 var _jump_buffer_timer := 0.0
+var _double_jump_available := false
 var _dash_timer := 0.0
 var _dash_cooldown := 0.0
 var _dash_direction := Vector2.RIGHT
@@ -179,7 +180,7 @@ func _update_rig(delta: float) -> void:
 
 func _start_dash(input_dir: Vector2) -> void:
 	_dash_direction = input_dir if input_dir != Vector2.ZERO else Vector2(signf(_rig.facing), 0.0)
-	_dash_timer = DASH_TIME
+	_dash_timer = DASH_TIME * (1.6 if GameState.has_ability(&"heavy_dash") else 1.0)
 	velocity = _dash_direction * DASH_SPEED
 	Sfx.play(&"dash", -6.0)
 
@@ -217,6 +218,7 @@ func _process_jump() -> void:
 	# precisa estar reposto antes da comparação com o buffer.
 	if is_on_floor():
 		_coyote_timer = COYOTE_TIME
+	_double_jump_available = GameState.has_ability(&"double_jump")
 
 	# O buffer NÃO é preenchido aqui: quem enche é `_unhandled_input`, que
 	# recebe o evento sempre. Poll por `is_action_just_pressed` dentro de
@@ -234,6 +236,14 @@ func _process_jump() -> void:
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
 		Sfx.play(&"jump", -5.0)
+	# Pulo duplo: so se a habilidade estiver desbloqueada e o corpo estiver
+	# no ar sem ter usado o segundo salto ainda.
+	elif _jump_buffer_timer > 0.0 and not is_on_floor() and _double_jump_available:
+		velocity.y = JUMP_VELOCITY * 0.85
+		_jump_buffer_timer = 0.0
+		_double_jump_available = false
+		Sfx.play(&"jump", -8.0)
+
 
 
 ## Entrada vinda do evento, não do polling: nunca perde um toque.
@@ -377,7 +387,7 @@ func _fire_heavy() -> void:
 func _try_parry() -> void:
 	if _dead:
 		return
-	_parry_timer = PARRY_WINDOW
+	_parry_timer = PARRY_WINDOW * (2.0 if GameState.has_ability(&"parry_plus") else 1.0)
 	Sfx.play(&"select", -6.0)
 
 

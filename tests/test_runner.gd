@@ -17,6 +17,7 @@ const SCENES := [
 	"res://scenes/levels/level_01.tscn",
 	"res://scenes/levels/level_02.tscn",
 	"res://scenes/levels/level_03.tscn",
+	"res://scenes/levels/level_04.tscn",
 	"res://scenes/actors/player/player.tscn",
 	"res://scenes/actors/enemies/slime.tscn",
 	"res://scenes/actors/enemies/bat.tscn",
@@ -186,6 +187,7 @@ func _run_unit_tests() -> void:
 	await _test_player_rig_poses()
 	await _test_parry()
 	_test_session_stats()
+	_test_abilities()
 	await _test_camera_look()
 	_test_hitstop()
 	await _test_combat_feedback()
@@ -2011,6 +2013,32 @@ func _test_boss() -> void:
 
 	arena.dispose()
 	await process_frame
+
+
+func _test_abilities() -> void:
+	_begin("GameState: habilidades e niveis")
+
+	_gs.call(&"reset")
+	_check(not _gs.call(&"has_ability", &"double_jump"), "comeca sem habilidades")
+	_check(_gs.call(&"unlock_ability", &"double_jump"), "desbloqueia habilidade nova")
+	_check(_gs.call(&"has_ability", &"double_jump"), "has_ability apos desbloqueio")
+	_check(not _gs.call(&"unlock_ability", &"double_jump"), "nao desbloqueia de novo")
+	_check(not _gs.call(&"unlock_ability", &"inexistente"), "id inexistente nao desbloqueia")
+	_check_eq(_gs.call(&"all_abilities").size(), 1, "uma habilidade desbloqueada")
+
+	# level unlock
+	_check(_gs.call(&"is_level_unlocked", &"level_01"), "level_01 sempre destravado")
+	_check(not _gs.call(&"is_level_unlocked", &"level_02"), "level_02 bloqueado sem completar level_01")
+	_gs.call(&"complete_level", &"level_01")
+	_check(_gs.call(&"is_level_unlocked", &"level_02"), "level_02 destrava apos level_01")
+	_check(not _gs.call(&"is_level_unlocked", &"level_03"), "level_03 ainda bloqueado")
+
+	# save roundtrip
+	var dict: Dictionary = _gs.call(&"to_dict")
+	_gs.call(&"reset")
+	_gs.call(&"from_dict", dict)
+	_check(_gs.call(&"has_ability", &"double_jump"), "habilidade sobrevive ao save")
+	_check(_gs.call(&"is_level_completed", &"level_01"), "nivel completo sobrevive ao save")
 
 
 func _free_all_scenes() -> void:

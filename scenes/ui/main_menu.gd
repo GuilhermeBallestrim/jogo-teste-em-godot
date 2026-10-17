@@ -9,7 +9,7 @@ const OPTIONS_SCENE := "res://scenes/ui/options_panel.tscn"
 const LEVEL_LABELS := {
 	&"level_01": "1 - Corredores",
 	&"level_02": "2 - Torres",
-	&"level_03": "3 - Misto",
+	&"level_04": "4 - Boss",
 }
 
 @onready var _play: Button = %PlayButton
@@ -145,6 +145,9 @@ func _build_level_list() -> void:
 			continue
 
 		var label: String = LEVEL_LABELS.get(id, String(id))
+		var unlocked := GameState.is_level_unlocked(id)
+		if not unlocked:
+			label = "%s  (bloqueada)" % label
 		if resumed and id == last_played:
 			label += "  (continuar)"
 
@@ -152,6 +155,7 @@ func _build_level_list() -> void:
 		button.text = label
 		button.custom_minimum_size = Vector2(260, 0)
 		button.pressed.connect(_on_level_pressed.bind(id, path))
+		button.disabled = not GameState.is_level_unlocked(id)
 		_level_list.add_child(button)
 		_level_buttons.append(button)
 
