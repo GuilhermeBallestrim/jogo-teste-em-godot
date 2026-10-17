@@ -113,13 +113,21 @@ de pulo). Refeito.
 
 ---
 
-## Fase 3 — Polish (pendente)
+## Fase 3 — Polish (3.1 feito)
 
-### 3.1 Feedback de combate
+### 3.1 Feedback de combate - **feito**
 
-- Hitstop (congelar 2 frames no impacto)
-- Knockback já existe; falta número decai no pulo
-- Tremor de tela escalando com o dano
+- Hitstop: congela o relogio por 1 a 4 quadros conforme o dano, com teto de
+  120 ms para nenhum golpe travar o jogo
+- Numero de dano subindo no ponto do golpe, com contorno, e a cor dizendo de
+  quem foi: vermelho no player, verde no inimigo
+- Tremor de tela escalando com o dano (0.45 a 1.0), em vez dos 0.8 fixos
+- Poeira ao correr, respingo ao pousar, rastro no dash e estouro na morte do
+  inimigo
+
+Prova: 399 checagens no testador e 9 capturas medidas por
+`tools/capture_feel.gd`. O que a captura **mexeu** no plano: o numero do
+inimigo era dourado e sumia entre as moedas, e foi para verde.
 
 ### 3.2 Stats de sessão
 
@@ -133,21 +141,50 @@ ter 9 poses legíveis sem um único arquivo de imagem — e que a decisão
 
 ---
 
-## Onda seguinte
+## Onda 1 -- **pronta**
 
-O detalhamento de cada feature (onde mexer, como verificar, o que cortar se
-parar no meio) está em [`plano-evolucao.md`](plano-evolucao.md). Resumo da
-ordem:
+Camera com antecipacao, feedback de combate e particulas. As tres entraram.
+O detalhamento continua em [`plano-evolucao.md`](plano-evolucao.md).
+
+| Item | O que foi | Onde |
+|---|---|---|
+| Camera | Antecipacao ate 74 px, proporcional a velocidade; estica 1.5x e da zoom no dash; volta ao centro mais rapdo do que sai | `src/camera/camera_look.gd` |
+| Hitstop | Congela o relogio por 1-4 quadros conforme o dano, com teto de 120 ms | `autoload/hitstop.gd` |
+| Numero de dano | Sobe e some no ponto do golpe; vermelho no player, verde no inimigo | `scenes/ui/floating_number.gd` |
+| Tremor | Escala com o dano em vez de valer 0.8 fixo | `src/camera/camera_shake.gd` |
+| Particulas | Poeira ao correr, respingo ao pousar, rastro no dash, estouro na morte | `src/fx/particle_preset.gd` |
+
+**Verificacao.** 399 checagens no testador (era 335), mais
+`tools/capture_feel.gd`, que tira 9 fotos e mede cada efeito.
+
+Tres coisas mudaram de ideia por causa da verificacao, e nao do plano:
+
+- O numero de dano do inimigo era **dourado** -- a mesma cor das moedas e da
+  faixa das plataformas. A captura mostrou o numero sumindo no cenario. Foi
+  para verde, que nao existe em lugar nenhum da paleta.
+- A antecipacao media **+2.5 px** num dia e **+67.9 px** no seguinte. Nao era
+  a camera: era o bone correndo no buraco da fase e voltando do checkpoint. Os
+  tiros de camera passaram a rodar na arena plana.
+- A ferramenta contava pixels da cor do efeito e dava **"1505 px de
+  vermelho"** como prova do numero de dano. Eram o slime. Passou a contar
+  diferenca contra um controle.
+
+**O que continua sem prova automatica:** o peso do hitstop. Um instante
+congelado e indistinguivel de um instante normal numa foto. So se sente
+jogando.
+
+---
+
+## Ondas seguintes
 
 ```
-Onda 1  camera → feedback de combate → particulas
-Onda 2  stats → save por slot/hub → mais verbos de combate
-Onda 3  editor de layout → mais inimigos → mais fases
+Onda 2  stats de sessao -> save por slot/hub -> mais verbos de combate
+Onda 3  editor de layout -> mais inimigos -> mais fases
 ```
 
-O principleo que organiza: **cada onda faz o jogo parecer mais finished, não
-maior.** Câmera com antecipação vale mais que uma quarta fase, porque afeta
-todas elas.
+O principio que organiza continua o mesmo: **cada onda faz o jogo parecer mais
+finished, nao maior.** Camera com antecipacao valeu mais que uma quarta fase
+porque afeta todas elas.
 
 ---
 
@@ -167,7 +204,7 @@ dívida conhecida e documentada.
 Fase 0  testes do FSM  ->  base da fase  ->  save/reset        [feito]
 Fase 1  voador -> atirador -> fase 2 -> coletável            [feito]
 Fase 2  inventário -> remapear -> acessibilidade             [feito]
-Fase 3  feedback -> stats -> arte                            [pendente]
+Fase 3  feedback (feito) -> stats -> arte                  [parcial]
 ```
 
 ---
@@ -192,9 +229,14 @@ animar personagem, ou o trabalho é jogado fora.
 
 ---
 
-## Sugestão de corte
+## Proximo bloco
 
-O próximo bloco que mais rende é a **Fase 3.1 (feedback de combate)**:
-hitstop é a mudança mais barata que mais altera a sensação de um golpe, e
-os sistemas de que ele depende já existem. O 3.2 (stats) é o que dá motivo
-para rejogar, mas espera o feedback estar no lugar.
+O 3.1 (feedback de combate) ja entrou, junto com camera antecipada e
+particulas. O que mais rende agora e o **3.2 (stats de sessao)**: e o que da
+motivo para rejogar, e a tela de vitoria fica mais interessante agora que o
+golpe tem peso.
+
+Antes dele, uma decisao continua pendente: a **3.3 (arte)**. E a unica
+dependencia externa do plano, e tem que entrar antes das fases novas se for
+arte importada -- senao o layout das fases e desenhado para bone de
+`Polygon2D` e jogado fora.

@@ -65,6 +65,15 @@ func is_shaking() -> bool:
 	return _running
 
 
+## Intensidade do tremor pedido no ultimo golpe, 0.0 a 1.0.
+##
+## [method is_shaking] so diz se ha tremor; isto diz se o tremor foi forte ou
+## fraco. E o que permite testar que a escala de dano funciona -- e a escala
+## de dano nao da para ver num instantaneo de tela.
+func strength() -> float:
+	return _strength
+
+
 func stop() -> void:
 	_running = false
 	_strength = 0.0

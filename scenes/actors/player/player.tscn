@@ -1,10 +1,11 @@
-[gd_scene load_steps=9 format=3 uid="uid://d3k5b5kg1fca5"]
+[gd_scene load_steps=10 format=3 uid="uid://d3k5b5kg1fca5"]
 
 [ext_resource type="Script" uid="uid://c1n7fxtny075t" path="res://scenes/actors/player/player.gd" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/actors/player/player_rig.tscn" id="9_rig"]
 [ext_resource type="Script" uid="uid://2xrdedeeyjn5" path="res://src/combat/hurtbox.gd" id="2_hurtbox"]
 [ext_resource type="Script" uid="uid://briv8c3ehth6u" path="res://src/combat/hitbox.gd" id="3_hitbox"]
 [ext_resource type="Script" uid="uid://deho6ip88faqg" path="res://src/camera/camera_shake.gd" id="4_shake"]
+[ext_resource type="Script" path="res://src/camera/camera_look.gd" id="5_look"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_body"]
 radius = 16.0
@@ -51,7 +52,18 @@ scale_amount_min = 2.0
 scale_amount_max = 3.5
 color = Color(1, 0.92, 0.62, 1)
 
+[node name="Dust" type="CPUParticles2D" parent="."]
+position = Vector2(0, 26)
+
+[node name="Splash" type="CPUParticles2D" parent="."]
+position = Vector2(0, 27)
+
+[node name="Trail" type="CPUParticles2D" parent="."]
+position = Vector2(0, 4)
+
 [node name="Camera2D" type="Camera2D" parent="."]
+script = ExtResource("5_look")
+target_path = NodePath("..")
 limit_left = -800
 limit_top = -560
 limit_right = 800

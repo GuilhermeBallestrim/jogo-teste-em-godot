@@ -1,6 +1,17 @@
 # Plano de evolução
 
 Roadmap de features depois da Fase 2. Nao e promessa -- e ordem sugerida com o
+
+## Status
+
+**Onda 1 (o jogo acorda) esta pronta.** Camera com antecipacao,
+hitstop, numero de dano, tremor escalado com o dano, poeira, respingo,
+rastro do dash e estouro na morte do inimigo. Tres coisas mudaram de
+ideia no meio do caminho -- ver `docs/roadmap.md` secao "Onda 1".
+
+Onda 2 (stats, slots, mais verbos) e Onda 3 (editor de layout, mais
+inimigos, mais fases) continuam pendentes.
+
 motivo de cada passo e como verificar que ficou bom.
 
 Tamanhos são relativos: **P** = um dia de trabalho, **M** = dois ou três,
@@ -27,7 +38,7 @@ Exceção: quando você tem certeza do que falta é *conteúdo*, pule para a Ond
 Nenhuma dependência. Pode começar hoje, em qualquer ordem dentro da onda.
 **Comece por A.**
 
-### A. Câmera com antecipação — **P**
+### A. Camera com antecipacao - **feito**
 
 **Por quê.** A `Camera2D` hoje segue o player rigidamente. Antecipar na direção
 do movimento e dar um zoom de leve durante o dash é a mudança mais barata que
@@ -51,7 +62,7 @@ a direita e para a esquerda. E é jogar.
 **Cuidado.** A antecipação não pode furar os `limit_*` da câmera, nem empurrar
 o bone para fora da tela nas bordas estreitas da fase 2.
 
-### B. Feedback de combate — **M** (roadmap 3.1)
+### B. Feedback de combate - **feito**
 
 **Por quê.** O golpe pega, tira vida e acende uma partícula. Não tem peso.
 
@@ -72,7 +83,7 @@ O número é o mais visível e o mais fácil; faça-o mesmo se o resto atrasar.
 golpe) é determinístico e vale escrever. O número e o tremor são leitura —
 captura de tela.
 
-### C. Partículas e efeitos — **M**
+### C. Particulas e efeitos - **feito**
 
 **Por quê.** O único `CPUParticles2D` do projeto é o faísca do golpe do
 player. Poeira ao correr, respingo ao aterrissar, rastro no dash e explosão na

@@ -44,10 +44,19 @@ const LEDGE_DEPTH := 28.0
 ## queda. Existe para o caso do knockback e de plataforma que some no meio
 ## da fase.
 const DEFAULT_FALL_LIMIT := 280.0
-
 const HITBOX_ACTIVE_TIME := 0.16
 const ATTACK_TIME := 0.22
+
+## Cor do numero de dano que o inimigo leva.
+##
+## Era dourado, e a captura mostrou por que isso nao funciona: o jogo inteiro
+## e dourado -- moeda, faixa de plataforma, moeda grande. O numero sumia no
+## cenario, que e o oposto do que um numero de dano tem que fazer. Verde nao
+## existe em lugar nenhum da paleta atual (bone azul, scarf vermelho, slime
+## rosa, cenario azul-marinho), entao o numero aparece sobre qualquer fundo.
+const HIT_NUMBER_COLOR := Color(0.55, 1.0, 0.5)
 const ATTACK_RECOVER := 0.45
+
 const ATTACK_COOLDOWN := 0.7
 const STAGGER_TIME := 0.24
 
@@ -435,6 +444,13 @@ func apply_damage(amount: int, source: Node, direction: Vector2, knockback: floa
 		return
 
 	health -= amount
+
+	# Hitstop e numero de dano valem para os dois lados da briga: o golpe que
+	# o player leva e o golpe que ele da precisam pesar igual, senao o jogo
+	## premia o jogador por bater em algo.
+	var frames := int(round(lerpf(1.0, 3.0, clampf(float(amount) / 3.0, 0.0, 1.0))))
+	Hitstop.trigger(frames)
+	FloatingNumber.spawn(get_tree().current_scene, global_position, amount, HIT_NUMBER_COLOR)
 	Sfx.play(&"enemy_hit", -7.0)
 	_flash()
 	_update_health_bar()
@@ -472,6 +488,10 @@ func _die(source: Node) -> void:
 	GameState.add_score(50)
 	Sfx.play(&"enemy_die", -6.0)
 	died.emit(self)
+
+	# O estouro nasce solto na cena, e nao como filho do inimigo: a explosao
+	# tem que continuar depois que queue_free leva o corpo embora.
+	ParticlePreset.spawn_burst(get_tree().current_scene, global_position, _sprite.color)
 
 	var tween := create_tween()
 	tween.tween_property(_sprite, "modulate", Color(0.7, 0.7, 0.7, 0.0), 0.45)

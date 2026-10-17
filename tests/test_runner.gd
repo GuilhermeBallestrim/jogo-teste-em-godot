@@ -34,6 +34,8 @@ const LEVELS := [
 
 const MENU_SCENE := "res://scenes/ui/main_menu.tscn"
 const RIG_SCENE := "res://scenes/actors/player/player_rig.tscn"
+const PLAYER_SCENE := "res://scenes/actors/player/player.tscn"
+const SLIME_SCENE := "res://scenes/actors/enemies/slime.tscn"
 
 var _passed := 0
 var _failed := 0
@@ -177,6 +179,10 @@ func _run_unit_tests() -> void:
 	await _test_levels_keep_enemies()
 	await _test_menu_lists_every_level()
 	await _test_player_rig_poses()
+	await _test_camera_look()
+	_test_hitstop()
+	await _test_combat_feedback()
+	await _test_particle_presets()
 	_unit_done = true
 
 
@@ -1794,3 +1800,366 @@ func _free_all_scenes() -> void:
 		audio.stop_music(0.0)
 	Sfx.clear_cache()
 	Music.clear_cache()
+
+# ------------------------------------------------- onda 1: sensacao de jogo
+
+
+## Alvo do dash, em px, bem acima do teto de antecipacao normal. Se a
+## antecipacao aumentar durante o dash, ela precisa passar deste valor; senao o
+## teste passaria sem provar nada.
+const DASH_LOOK_FLOOR := 90.0
+
+
+## A antecipacao da camera e leitura, nao regra -- mas o *valor* e regra.
+## Um instantaneo de tela mostra se o bone esta no centro; nao mostra se a
+## camera respondeu a velocidade. Aqui o componente e chamado direto com delta
+## fixo e sem fisica: o que se prova e a resposta a velocidade, nao o
+## movimento do player.
+func _test_camera_look() -> void:
+	_begin("Camera: antecipacao")
+
+	var body := CharacterBody2D.new()
+	root.add_child(body)
+	var cam := CameraLook.new()
+	cam.target_path = ^".."
+	body.add_child(cam)
+	await process_frame
+
+	if cam == null:
+		_check(false, "CameraLook instanciou")
+		body.free()
+		return
+	_spawned.append(body)
+	_check(cam.get_parent() == body, "CameraLook comeca apontado para o corpo")
+
+	# Correndo para a direita na maxima: tem de saturar o teto.
+	_drive_look(cam, body, PlayerTuning.SPEED, 120)
+	_check(cam.look_offset() > 60.0, "antecipa para a direita correndo (%.1f px)" % cam.look_offset())
+	_check(
+		cam.look_offset() <= cam.look_ahead + 0.01,
+		"nao passa do teto (%.1f px de %.1f)" % [cam.look_offset(), cam.look_ahead]
+	)
+
+	# Para a esquerda: mesmo tamanho, sinal invertido. Uma antecipacao que
+	# so funciona num sentido vira um arrasto no outro.
+	_drive_look(cam, body, -PlayerTuning.SPEED, 240)
+	_check(cam.look_offset() < -60.0, "antecipa para a esquerda correndo (%.1f px)" % cam.look_offset())
+
+	# Parado a camera volta ao centro. E o que impede ela de "descolar" depois
+	# de cada corrida -- e e por isso que a volta e mais rapida que a ida.
+	_drive_look(cam, body, 0.0, 240)
+	_check(absf(cam.look_offset()) < 1.0, "volta ao centro ao parar (%.2f px)" % cam.look_offset())
+
+	# Andando devagar antecipa pouco. Com antecipacao cheia, o bone some atras
+	# da parede no fim de um corredor estreito -- que e a fase 2 inteira.
+	_drive_look(cam, body, PlayerTuning.SPEED * 0.25, 240)
+	_check(
+		cam.look_offset() > 0.0 and cam.look_offset() < cam.look_ahead * 0.6,
+		"antecipacao proporcional a velocidade (%.1f px de %.1f)" % [cam.look_offset(), cam.look_ahead]
+	)
+
+	# Desligar existe para comparar os dois lados na captura, nao por enfeite.
+	cam.lookahead_enabled = false
+	var parked := cam.look_offset()
+	_drive_look(cam, body, PlayerTuning.SPEED, 90)
+	_check_eq(cam.look_offset(), parked, "desligado nao move a camera")
+	cam.lookahead_enabled = true
+
+	await _test_camera_dash_boost()
+
+
+## Durante o dash a antecipacao estica, porque o corpo some dentro do rastro e
+## a camera precisa mostrar para onde ele vai.
+##
+## Usa o player de verdade porque `is_dashing()` faz parte do contrato: um
+## bone generico nao responde, e um teste que so mede o componente nunca
+## prova que o jogo inteiro estica junto.
+func _test_camera_dash_boost() -> void:
+	var packed := load(PLAYER_SCENE) as PackedScene
+	_check(packed != null, "player.tscn carregou para o teste do dash")
+	if packed == null:
+		return
+
+	var player := packed.instantiate() as CharacterBody2D
+	root.add_child(player)
+	_spawned.append(player)
+	await process_frame
+
+	var cam := player.get_node_or_null(^"Camera2D") as CameraLook
+	if cam == null:
+		_check(false, "player tem CameraLook no no Camera2D")
+		return
+
+	player._start_dash(Vector2.RIGHT)
+	_check(player.is_dashing(), "dash comecou")
+	if not player.is_dashing():
+		return
+
+	# Sem `await` dentro do laco: a fisica do player nao roda e o dash nao
+	# expira no meio da medicao.
+	for _i in 60:
+		cam._process(1.0 / 60.0)
+
+	_check(
+		absf(cam.look_offset()) > DASH_LOOK_FLOOR,
+		"dash estica a antecipacao (%.1f px, precisa passar de %.0f)" % [absf(cam.look_offset()), DASH_LOOK_FLOOR]
+	)
+	_check(
+		absf(cam.look_offset()) <= cam.look_ahead * cam.dash_boost + 0.01,
+		"dash nao passa do teto do boost (%.1f px de %.1f)" % [absf(cam.look_offset()), cam.look_ahead * cam.dash_boost]
+	)
+
+
+## Empurra o componente com velocidade constante. Sem `await` de proposito:
+## qualquer quadro automatico aqui mostraria o resultado, e o teste
+## viraria medida de ambiente em vez de medida da funcao.
+func _drive_look(cam: CameraLook, body: CharacterBody2D, vx: float, frames: int) -> void:
+	body.velocity = Vector2(vx, 0.0)
+	for _i in frames:
+		cam._process(1.0 / 60.0)
+
+
+## O congelamento e o efeito mais barato que mais pesa no impacto -- e o
+## unico item da onda que pode travar o jogo inteiro se der errado.
+##
+## Nenhum `await` aqui, de proposito: com `Engine.time_scale` em zero, um
+## `await physics_frame` nao vence nunca e o runner trava para sempre. O
+## ultimo bloco deste teste existe para garantir que o relogio volte.
+func _test_hitstop() -> void:
+	_begin("Hitstop: congelamento no impacto")
+
+	var hitstop := root.get_node_or_null(^"Hitstop")
+	_check(hitstop != null, "autoload Hitstop ausente")
+	if hitstop == null:
+		return
+
+	hitstop.cancel()
+	_check(not hitstop.is_running(), "comeca parado")
+	_check_eq(Engine.time_scale, 1.0, "relogio normal antes de comecar")
+
+	hitstop.trigger(2)
+	_check(hitstop.is_running(), "trigger congela")
+	_check(Engine.time_scale < 1.0, "relogio desacelera (%.2f)" % Engine.time_scale)
+	_check(hitstop.remaining() > 0.0, "faltam quadros para voltar")
+
+	# Encadear dois golpes no mesmo quadro. O mais fraco nao pode substituir
+	# o mais forte: dois acertos juntos tem de soar como um, nao como o ultimo.
+	hitstop.trigger(2, 0.06)
+	var forte := Engine.time_scale
+	hitstop.trigger(2, 0.9)
+	_check_eq(Engine.time_scale, forte, "congelamento fraco nao substitui forte")
+
+	# O contrario precisa funcionar: um golpe grande pesa mais que um pequeno
+	# que veio antes, e nao menos.
+	hitstop.trigger(6, 0.02)
+	_check(Engine.time_scale < forte, "congelamento forte substitui fraco (%.3f)" % Engine.time_scale)
+
+	# Teto absoluto. Sem isto, um par de codigos Asked com 999 quadros trava o
+	# jogo em definitivo e o jogador so pode fechar o processo.
+	hitstop.cancel()
+	hitstop.trigger(999, 1.0)
+	_check(
+		hitstop.remaining() <= 0.121,
+		"congelamento tem teto (%.3f s de 0.120 s)" % hitstop.remaining()
+	)
+
+	# Parametro invalido nao pode congelar nada.
+	hitstop.cancel()
+	hitstop.trigger(0)
+	_check(not hitstop.is_running(), "trigger com 0 quadros nao congela")
+	_check_eq(Engine.time_scale, 1.0, "relogio intacto apos trigger invalido")
+
+	# Este bloco e o mais importante do arquivo inteiro: sem ele, um congelamento
+	# esquecido contaminaria todas as suites seguintes, que rodariam em
+	# camera lenta e continuariam dando "PASSARAM".
+	hitstop.trigger(4)
+	hitstop.cancel()
+	_check(not hitstop.is_running(), "cancel encerra o congelamento")
+	_check_eq(Engine.time_scale, 1.0, "cancel devolve o relogio")
+
+
+## Os tres recados do golpe: numero flutuante, tremor que escala com o dano e
+## hitstop que dura mais no golpe grande.
+##
+## O numero em si e leitura de tela. O que se prova aqui e a *ligacao*: que a
+## posicao e de mundo, que a cor distingue quem levou o golpe, e que as duas
+## intensidades sao derivadas do dano e nao constantes.
+func _test_combat_feedback() -> void:
+	_begin("Combate: numero, tremor e peso")
+
+	var host := Node2D.new()
+	root.add_child(host)
+	_spawned.append(host)
+	await process_frame
+
+	# --- numero flutuante ---
+	var number := FloatingNumber.spawn(host, Vector2(120, -45), 7, Color.RED)
+	_check(number != null, "numero de dano criado")
+	if number != null:
+		# Sem espera antes: o numero ja comeca a subir no primeiro quadro, e
+		# medir depois mediria o movimento, nao a origem. A posicao e conferida
+		# no mesmo instante em que [method FloatingNumber.spawn] devolve.
+		_check(
+			number.global_position.distance_to(Vector2(120, -45)) < 0.01,
+			"numero nasce no ponto do golpe, em coordenada de mundo"
+		)
+
+		# E a prova de que a subida e ancorada ali, e nao num canto qualquer da
+		# tela: um tween montado antes da posicao estar definida sobe a partir
+		# de (0,0), e o teste acima nao pegaria isso -- ele so veria a origem
+		# certa se ela nao fosse sobrescrita um quadro depois.
+		var nascimento := number.global_position.y
+		await create_timer(0.2).timeout
+		_check(
+			number.global_position.y < nascimento - 5.0,
+			"numero sobe a partir do ponto do golpe (%.0f -> %.0f)" % [nascimento, number.global_position.y]
+		)
+
+		var label := number.get_node_or_null(^"Label") as Label
+		_check(label != null, "numero tem Label")
+		if label != null:
+			_check_eq(label.text, "7", "numero mostra o dano que foi dado")
+			_check(
+				label.get_theme_color(&"font_color") == Color.RED,
+				"numero herda a cor de quem levou o golpe"
+			)
+			_check(
+				label.get_theme_constant(&"outline_size") > 0,
+				"numero tem contorno (cenario escuro engole o texto sem ele)"
+			)
+
+	# --- guarda do chamador nulo ---
+	# Este caminho rodava em todo golpe de todo inimigo quando nao havia cena
+	# corrente, e derrubava o jogo inteiro -- nao so o numero decorativo.
+	_check(FloatingNumber.spawn(null, Vector2.ZERO, 1, Color.RED) == null, "numero com pai nulo nao quebra")
+
+	# --- autoliberação ---
+	# Sem isso uma briga longa acumula um no por golpe e a taxa de quadros
+	# despenca sem ninguem saber de onde veio.
+	var doomed := FloatingNumber.spawn(host, Vector2.ZERO, 1, Color.BLUE)
+	_check(doomed != null, "numero de teste criado")
+	await create_timer(1.2).timeout
+	_check(not is_instance_valid(doomed), "numero se autolibera")
+
+	# --- tremor escalado ---
+	# Constante, o tremor mente sobre a diferenca entre tropecar e ser
+	# arremessado. Nao da para ver isso num instantaneo de tela: so comparando.
+	if _settings != null:
+		_settings.shake_scale = 1.0
+	var shake := CameraShake.new()
+	host.add_child(shake)
+	await process_frame
+
+	shake.shake_for(1.0)
+	var tremor_max := shake.strength()
+	shake.stop()
+	shake.shake_for(0.45)
+	var tremor_fraco := shake.strength()
+	_check(tremor_max > tremor_fraco, "golpe grande treme mais (%.2f > %.2f)" % [tremor_max, tremor_fraco])
+	_check_eq(tremor_fraco, 0.45, "intensidade fraca aplicada como pedida")
+
+	# Um tremor ja em curso nunca pode ser rebaixado por um golpe fraco: o
+	# jogador sentiria a tela "pular" de menos para mais.
+	shake.shake_for(1.0)
+	shake.shake_for(0.2)
+	_check_eq(shake.strength(), 1.0, "tremor fraco nao rebaixa tremor forte em curso")
+	shake.stop()
+
+	# --- hitstop ligado ao dano ---
+	await _test_damage_scales_hitstop(host)
+
+
+## O golpe no inimigo tem de congelar mais quanto maior o dano. Dois slimes
+## porque o segundo golpe mata e `_die` libera o corpo -- o hitstop e pedido
+## antes disso, e e exatamente a leitura que importa: o golpe que mata e o
+## golpe que mais tem que pesar.
+func _test_damage_scales_hitstop(host: Node) -> void:
+	var hitstop := root.get_node_or_null(^"Hitstop")
+	var packed := load(SLIME_SCENE) as PackedScene
+	if hitstop == null or packed == null:
+		_check(false, "hitstop e slime disponiveis para o teste de escala")
+		return
+
+	var weak := packed.instantiate()
+	host.add_child(weak)
+	var strong := packed.instantiate()
+	host.add_child(strong)
+	await process_frame
+
+	hitstop.cancel()
+	weak.call(&"apply_damage", 2, null, Vector2.RIGHT, 0.0)
+	_check(hitstop.is_running(), "golpe no inimigo congela o relogio")
+	var fraco: float = hitstop.remaining()
+	hitstop.cancel()
+
+	strong.call(&"apply_damage", 3, null, Vector2.RIGHT, 0.0)
+	_check(hitstop.is_running(), "golpe que mata tambem congela")
+	var forte: float = hitstop.remaining()
+	hitstop.cancel()
+
+	_check(
+		forte > fraco,
+		"dano maior congela mais tempo (%.3f s > %.3f s)" % [forte, fraco]
+	)
+	_check_eq(Engine.time_scale, 1.0, "relogio devolvido ao fim do teste de combate")
+
+
+## Os quatro presets, mais a guarda de quem os chama.
+##
+## O que se verifica e configuracao, nao aparencia: aparencia e captura de
+## tela. O que *dá* para provar em teste e que nenhum preset fica ligado sem
+## querer, que nenhum deixa a particula sumir de um quadro para o outro, e
+## que os presets nao quebram quem chama com pai invalido -- caminho que rodou
+## em todo golpe de todo inimigo quando ainda nao havia cena corrente.
+func _test_particle_presets() -> void:
+	_begin("Particulas: presets")
+
+	var dust := ParticlePreset.dust(CPUParticles2D.new())
+	var splash := ParticlePreset.splash(CPUParticles2D.new())
+	var trail := ParticlePreset.trail(CPUParticles2D.new())
+	var burst := ParticlePreset.burst(CPUParticles2D.new(), Color.ORANGE)
+
+	_check(not dust.emitting, "poeira nao emite sozinha (so quando o corpo corre)")
+	_check(not dust.local_coords, "poeira fica no mundo em vez de andar com o corpo")
+	_check(dust.amount > 0 and dust.lifetime > 0.0, "poeira tem quantidade e duracao")
+
+	_check(splash.one_shot, "respingo e um disparo so")
+	_check(splash.explosiveness >= 0.9, "respingo sai todo de uma vez")
+
+	_check(trail.scale_amount_curve != null, "rastro encolhe ao longo da vida")
+	if trail.scale_amount_curve != null:
+		_check_eq(trail.scale_amount_curve.point_count, 3, "curva do rastro tem 3 pontos")
+	_check(not trail.emitting, "rastro so emite durante o dash")
+
+	_check(burst.one_shot, "estouro e um disparo so")
+	_check(burst.spread >= 179.0, "estouro sai radial, nao para um lado")
+
+	# Todo emissor precisa de rampa de alpha. Sem ela a particula salta de 100%
+	# para 0% no ultimo quadro e pisca -- bem visivel numa captura pequena.
+	var named := {"poeira": dust, "respingo": splash, "rastro": trail, "estouro": burst}
+	for label: String in named:
+		var node := named[label] as CPUParticles2D
+		_check(node.color_ramp != null, "%s tem rampa de alpha" % label)
+		_check(node.color.is_equal_approx(Color.WHITE), "%s deixa a cor para a rampa" % label)
+
+	for label: String in named:
+		(named[label] as CPUParticles2D).free()
+
+	_check(
+		ParticlePreset.spawn_burst(null, Vector2.ZERO, Color.RED) == null,
+		"estouro com pai nulo nao quebra"
+	)
+	var host := Node2D.new()
+	root.add_child(host)
+	_spawned.append(host)
+	await process_frame
+	var live := ParticlePreset.spawn_burst(host, Vector2(50, 60), Color.RED, 6)
+	_check(live != null, "estouro criado com pai valido")
+	if live != null:
+		_check(live.one_shot, "estouro criado ja e um disparo so")
+		_check_eq(live.amount, 6, "estouro respeita a quantidade pedida")
+		_check(live.global_position.distance_to(Vector2(50, 60)) < 0.01, "estouro nasce no ponto pedido")
+	# Um no solto, nunca liberado, e a origem do aviso de "ObjectDB instances
+	# leaked at exit" que ja existe no fim do runner.
+	live.queue_free()
+	await process_frame

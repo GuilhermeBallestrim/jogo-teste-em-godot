@@ -38,7 +38,15 @@ const IFRAME_TIME := PlayerTuning.IFRAME_TIME
 const HURT_KNOCKBACK := PlayerTuning.HURT_KNOCKBACK
 const DEFAULT_GRAVITY := PlayerTuning.DEFAULT_GRAVITY
 
+## Cor do numero de dano que o player leva. Vermelho: o numero e sobre o
+## jogador, e vermelho e a cor que o jogador ja associa a "perdi vida".
+const HURT_NUMBER_COLOR := Color(1.0, 0.44, 0.44)
+
 @export var gravity_scale := 1.0
+
+## Abaixo disso o corpo esta andando, nao correndo, e poeira de corrida
+## ficaria esquisita. Mesma faixa que o bone usa para distinguir passos.
+const DUST_SPEED := 120.0
 
 var _coyote_timer := 0.0
 var _jump_buffer_timer := 0.0
@@ -57,6 +65,9 @@ var _dead := false
 @onready var _hitbox: Hitbox = $Hitbox
 @onready var _spark: CPUParticles2D = $Hitbox/Spark
 @onready var _camera_shake: Node2D = $Camera2D/CameraShake
+@onready var _dust: CPUParticles2D = $Dust
+@onready var _splash: CPUParticles2D = $Splash
+@onready var _trail: CPUParticles2D = $Trail
 
 
 func _ready() -> void:
@@ -64,6 +75,12 @@ func _ready() -> void:
 	collision_mask = Layers.WORLD | Layers.ENEMY
 	_hitbox.damage = ATTACK_DAMAGE
 	_hitbox.hit.connect(_on_attack_connected)
+
+	# Presets aqui, e nao no .tscn: mudanca de aparencia e uma linha em
+	# src/fx/particle_preset.gd em vez de vinte linhas em um .tscn que ninguem abre.
+	ParticlePreset.dust(_dust)
+	ParticlePreset.splash(_splash)
+	ParticlePreset.trail(_trail)
 
 
 ## Gravidade efetiva deste corpo.
@@ -113,6 +130,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_update_facing(input_dir)
 	_check_landing()
+	_update_particles()
 
 
 func _process(delta: float) -> void:
@@ -272,7 +290,27 @@ func _check_landing() -> void:
 		if impact >= HARD_LANDING_SPEED:
 			_camera_shake.shake_for(0.35)
 			Sfx.play(&"land", -4.0)
+		# Respingo em qualquer pouso, forte ou fraco: o jogador precisa
+		# ver onde tocou o chao mesmo quando nao sentiu tremor.
+		_splash.restart()
 	_was_on_floor = on_floor
+
+
+## Poeira, respingo e rastro, ligados ao estado do corpo.
+##
+## Ficam juntos e nao nas tres funcois que os disparam porque os tres leem o
+## mesmo par de condicoes: "esta no chao" e "esta rapido". Espalhado pelo
+## arquivo, viraria mais um lugar para esquecer de ligar particula.
+func _update_particles() -> void:
+	var dashing := is_dashing()
+	# Poeira so no chao: no ar ela nao tem nem chao para levantar.
+	_dust.emitting = not dashing and is_on_floor() and absf(velocity.x) > DUST_SPEED
+
+	_trail.emitting = dashing
+	if dashing:
+		# O rastro sai para tras, e o dash pode ser para qualquer um dos quatro
+		# lados. Preset fixo so funcionaria em um deles.
+		_trail.direction = -_dash_direction
 
 
 func _tick_timers(delta: float) -> void:
@@ -316,7 +354,20 @@ func apply_damage(amount: int, source: Node, direction: Vector2, knockback: floa
 	_invuln_timer = IFRAME_TIME
 	_hurtbox.invulnerable = true
 	velocity += direction.normalized() * maxf(knockback, HURT_KNOCKBACK)
-	_camera_shake.shake_for(0.8)
+
+	# O tremor escala com o estrago. Constante, ele mente sobre a diferenca
+	# entre levar 1 e levar 25 -- que e a diferenca entre tropecar e ser
+	# arremessado.
+	var ratio := clampf(float(amount) / float(maxi(1, GameState.max_health)), 0.0, 1.0)
+	_camera_shake.shake_for(lerpf(0.45, 1.0, ratio))
+
+	# Hitstop mais longo quando o golpe foi grande: o congelamento e metade da
+	# leitura de peso, e um dano de 25 deveria pesar diferente de 1.
+	var frames := int(round(lerpf(1.0, 4.0, ratio)))
+	Hitstop.trigger(frames)
+
+	FloatingNumber.spawn(get_tree().current_scene, global_position, amount, HURT_NUMBER_COLOR)
+
 	Sfx.play(&"hurt")
 
 	GameState.take_damage(amount)

@@ -163,7 +163,8 @@ func _process(_delta: float) -> bool:
 		])
 		for problem in _problems:
 			push_error("CAPTURA: %s" % problem)
-		return _problems.is_empty()
+		quit(0 if _problems.is_empty() else 1)
+		return true
 
 	if _frames == 0:
 		var shot: Array = _shots[_index]

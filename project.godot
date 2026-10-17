@@ -22,6 +22,7 @@ Save="*res://autoload/save_manager.gd"
 Settings="*res://autoload/settings_manager.gd"
 Audio="*res://autoload/audio_manager.gd"
 SceneRouter="*res://autoload/scene_router.gd"
+Hitstop="*res://autoload/hitstop.gd"
 
 [display]
 
