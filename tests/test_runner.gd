@@ -1999,28 +1999,31 @@ func _test_boss() -> void:
 	var boss := arena.enemy
 	var health_before: int = boss.health
 
+	# O novo design e sempre hittable.
 	boss.call(&"apply_damage", 5, arena.player, Vector2.LEFT, 0.0)
-	_check_eq(boss.health, health_before, "boss nao toma dano fora da janela")
+	_check(boss.health < health_before, "boss toma dano")
 
-	var entered := false
-	var last_state := ""
+	# O boss cicla por estados (IDLE -> ATTACK -> VULNERABLE).
+	var seen := {}
 	for _i in 900:
 		await physics_frame
-		last_state = boss.state_name()
-		if last_state == "VULNERABLE":
-			entered = true
-			break
-	_check(entered, "boss entra em VULNERABLE")
+		seen[boss.state_name()] = true
+	_check(seen.has("IDLE"), "boss passa por IDLE")
+	_check(seen.has("ATTACK"), "boss passa por ATTACK")
+	_check(seen.has("VULNERABLE"), "boss passa por VULNERABLE")
 
-	if entered:
-		var h2: int = boss.health
-		boss.call(&"apply_damage", 5, arena.player, Vector2.LEFT, 0.0)
-		_check(boss.health < h2, "boss toma dano durante VULNERABLE")
+	# Fases: com vida cheia e fase 1.
+	var phase: int = boss.call(&"_get_phase")
+	_check_eq(phase, 1, "fase 1 com vida cheia")
+
+	# Reduzir vida para fase 2 e 3.
+	boss.health = boss.max_health / 2
+	_check_eq(boss.call(&"_get_phase"), 2, "fase 2 com metade da vida")
+	boss.health = boss.max_health / 4
+	_check_eq(boss.call(&"_get_phase"), 3, "fase 3 com um quarto da vida")
 
 	arena.dispose()
 	await process_frame
-
-
 func _test_abilities() -> void:
 	_begin("GameState: habilidades e niveis")
 

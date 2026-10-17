@@ -14,4 +14,4 @@ func _ready() -> void:
 		(_shape.shape as RectangleShape2D).size = body_size
 	slam_radius = 120.0
 	slam_damage = 1
-	barrage_count = 3
+	barrage_count_phase1 = 3

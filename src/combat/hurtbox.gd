@@ -34,6 +34,12 @@ func _on_area_entered(area: Area2D) -> void:
 	if hitbox == null or not hitbox.active:
 		return
 
+	# Ignora a hitbox do proprio dono: um corpo nao pode se acertar.
+	# Sem isto, inimigos cujo hitbox sobrepoem a hurtbox (o boss e o
+	# principal caso) se auto-danificam no instante em que a hitbox liga.
+	if hitbox.get_parent() == get_parent():
+		return
+
 	var direction := global_position.direction_to(hitbox.global_position)
 	if direction == Vector2.ZERO:
 		direction = Vector2.RIGHT
