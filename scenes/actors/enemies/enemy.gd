@@ -137,10 +137,15 @@ func _on_landed() -> void:
 ## `get_gravity()` devolve (0,0) sem "Custom Gravity" ligado em Project
 ## Settings > Physics > 2D, entao lemos o valor do projeto como fallback.
 func _apply_vertical(delta: float) -> void:
-	var g := get_gravity().y
+	# `get_gravity().y` pode vir negativo; a gravidade tem de ser positiva,
+	# senao `velocity.y += g` desacelera a subida em vez de puxar para baixo.
+	#
+	# O `* delta` é obrigatório: sem ele a gravidade entrava inteira a cada
+	# frame, e o hop do slime era praticamente engolido no mesmo passo.
+	var g := absf(get_gravity().y)
 	if g == 0.0:
-		g = float(ProjectSettings.get_setting("physics/2d/default_gravity", 980.0))
-	velocity.y += g * GRAVITY_SCALE
+		g = absf(float(ProjectSettings.get_setting("physics/2d/default_gravity", 980.0)))
+	velocity.y += g * GRAVITY_SCALE * delta
 
 
 func _tick_hitbox(delta: float) -> void:

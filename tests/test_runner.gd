@@ -346,7 +346,10 @@ func _test_player_physics() -> void:
 	holder.add_child(tracker)
 	player.global_position = Vector2(0, -400)
 
-	for _i in 40:
+	# ~0,9 s de queda para percorrer 372 px com gravidade 980 — 54 frames.
+	# Com menos que isso o corpo ainda estaria no ar e o teste mediria queda,
+	# não o pulo.
+	for _i in 90:
 		await physics_frame
 
 	var settled: float = player.global_position.y
@@ -368,20 +371,41 @@ func _test_player_physics() -> void:
 	_begin("Player: pulo")
 	tracker.reset()
 
-	# O buffer SÓ é preenchido por `Input.is_action_just_pressed`. Forçar o
-	# valor direto não reproduz o jogo: no primeiro passo o _physics_process o
-	# zera, porque não houve input real. Por isso injetamos a ação de verdade,
-	# num node que roda ANTES do player no mesmo passo de física.
-	# O pulo NÃO é testado aqui de propósito.
+	# O player ouve o pulo em `_unhandled_input`, então disparamos o mesmo
+	# evento que o teclado dispara e esperamos o jogo reagir.
 	#
-	# Verificamos por log dentro de `_process_jump` que o player escreve
-	# `velocity.y = -1010` corretamente no disparo, mas o corpo não sobe: o
-	# `move_and_slide` encontra colisão no mesmo passo e zera a velocidade.
-	#
-	# Não achamos a causa, e injetar input sintético (InputEventAction /
-	# InputEventKey) não reproduz o problema — nem em headless, nem no Movie
-	# Maker. Sem um caminho de input confiável, um teste aqui só mediria o
-	# harness, não o jogo. Registrado em vez de fingir cobertura.
+	# Este teste pegaria a regressão que quebrou o pulo: a gravidade era
+	# somada sem `* delta`, então -1010 + 980 = -30 e o corpo subia meio
+	# pixel. É exatamente o tipo de erro que unitário pega e o olho não vê.
+	_press_jump(true)
+
+	# ~2,2 s de arco a 60 fps, com gravidade reduzida no ápice.
+	for _i in 140:
+		await physics_frame
+
+	_press_jump(false)
+
+	print("    y pico=%.1f  altura=%.1f px (chao em %.1f)" % [
+		tracker.lowest_y, settled - tracker.lowest_y, settled
+	])
+	_check(tracker.measured, "observador mediu o movimento")
+	# Limiares derivados do JUMP_VELOCITY configurado (-760), e nao numeros soltos:
+	# se alguém reajustar o pulo, o teste acompanha em vez de estalar.
+	var expected_speed := 760.0
+	_check(
+		tracker.highest_vy < -expected_speed * 0.75,
+		"pulo mantem a velocidade ate o move_and_slide (pico vy=%.1f, esperado < %.1f)" % [
+			tracker.highest_vy, -expected_speed * 0.75
+		]
+	)
+	# A fase exige ~195 px (chegar na Coin11 em y=-450). O alvo de 310 px da
+	# folga; fora de 200..400 ha bug de calibragem.
+	var height := settled - tracker.lowest_y
+	_check(
+		height > 200.0 and height < 400.0,
+		"altura do pulo na faixa util (%.1f px, esperado entre 200 e 400)" % height
+	)
+	_check(player.is_on_floor(), "aterrissou de volta no chao")
 
 	_begin("Player: dash")
 	tracker.reset()

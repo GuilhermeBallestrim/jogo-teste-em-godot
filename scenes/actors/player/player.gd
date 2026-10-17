@@ -16,17 +16,24 @@ const AIR_ACCELERATION := 1600.0
 const GROUND_FRICTION := 3200.0
 const AIR_FRICTION := 900.0
 
-const JUMP_VELOCITY := -1010.0
+## Velocidade de subida. Com gravidade 980 e APEX_GRAVITY_SCALE 0,62 isso
+## da ~310 px de altura -- folgado para os 195 px que a fase exige (subir da
+## Coin11 em y=-450 passa a ser comfortably possível sem salto minúsculo).
+const JUMP_VELOCITY := -760.0
 ## Multiplicador aplicado quando o botao e solto no meio do pulo.
 ## 1.0 = altura fixa; menor = o pulo encurta e o controle fica mais fino.
 const JUMP_CUT := 0.45
 const COYOTE_TIME := 0.10
 const JUMP_BUFFER := 0.12
 ## Multiplicador da gravidade no topo do arco. Abaixo de 1 o jogador "flutua"
-## no apice, o que da tempo de ajustar a direcao no ar.
-const APEX_GRAVITY_SCALE := 0.62
+## no apice, o que da tempo de ajustar a direcao no ar -- mas tambem aumenta a
+## altura total do pulo, entao andar para 1.0 encurta o arco sem perder o
+## controle no topo.
+const APEX_GRAVITY_SCALE := 0.75
 const APEX_VELOCITY_THRESHOLD := 220.0
 const HARD_LANDING_SPEED := 700.0
+## Folga para tirar o pé da superfície antes do impulso do pulo.
+const JUMP_CLEARANCE := 1.5
 
 const DASH_SPEED := 980.0
 const DASH_TIME := 0.14
@@ -84,10 +91,14 @@ func _ready() -> void:
 ## "Custom Gravity" esteja ligado. Sem isso o corpo flutua, `is_on_floor()`
 ## nunca fica confiavel, o coyote time nao preenche e o pulo nunca dispara.
 func _gravity() -> float:
-	var from_engine := get_gravity().y
-	if from_engine != 0.0:
+	# Sempre positiva. `get_gravity().y` pode vir NEGATIVO (com "Custom
+	# Gravity" ligado o eixo Y aponta para baixo e a gravidade vem como
+	# -980). Somar esse valor em `velocity.y += _gravity()` fazia a gravidade
+	# DESACELERAR a subida: -1010 + -980 = -30, e o pulo virava um pulinho.
+	var from_engine := absf(get_gravity().y)
+	if from_engine > 0.0:
 		return from_engine
-	return float(ProjectSettings.get_setting("physics/2d/default_gravity", DEFAULT_GRAVITY))
+	return absf(float(ProjectSettings.get_setting("physics/2d/default_gravity", DEFAULT_GRAVITY)))
 
 
 ## Chamado pela [Hurtbox] quando a hitbox ativa encosta em um alvo valido.
@@ -100,7 +111,7 @@ func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
 
 	if _dead:
-		velocity.y += _step_gravity() * gravity_scale
+		velocity.y += _step_gravity(delta) * gravity_scale
 		move_and_slide()
 		return
 
@@ -116,7 +127,7 @@ func _physics_process(delta: float) -> void:
 		else:
 			_process_ground_air(delta, input_dir)
 			_process_jump()
-			velocity.y += _step_gravity() * gravity_scale
+			velocity.y += _step_gravity(delta) * gravity_scale
 
 	move_and_slide()
 	_update_facing(input_dir)
@@ -178,12 +189,18 @@ func _process_jump() -> void:
 	if is_on_floor():
 		_coyote_timer = COYOTE_TIME
 
-	# O buffer NÃO é preenchido aqui. Isso acontecia com
-	# `Input.is_action_just_pressed(&"jump")`, que vale por um único frame: se o
-	# passo de física rodar antes de o InputMap consumir o evento do teclado, a
-	# leitura passa batido e o pulo simplesmente nunca acontece. Agora quem
-	# enche o buffer é `_unhandled_input`, que recebe o evento sempre.
+	# O buffer NÃO é preenchido aqui: quem enche é `_unhandled_input`, que
+	# recebe o evento sempre. Poll por `is_action_just_pressed` dentro de
+	# `_physics_process` pode perder o toque se o passo de física rodar antes
+	# de o InputMap consumir o evento do teclado.
 	if _jump_buffer_timer > 0.0 and _coyote_timer > 0.0:
+		# Afasta o pé da superfície antes do impulso, com folga. Sem isto uma
+		# penetração de fração de pixel faz o `move_and_slide` ler o impulso
+		# como movimento para dentro do chão.
+		var floor_normal := get_floor_normal()
+		if floor_normal != Vector2.ZERO:
+			global_position += floor_normal * JUMP_CLEARANCE
+
 		velocity.y = JUMP_VELOCITY
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
@@ -201,15 +218,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_attack()
 
 
-## Gravidade do passo, com flutuação no topo do arco do pulo.
+## Aceleração da gravidade **por segundo**, aplicada ao passo atual.
 ##
-## Prender no apice dá tempo de corrigir a direção no ar, que é o que faz um
-## pulo parecer "controlável" em vez de um arco rígido. Só vale na subida.
-func _step_gravity() -> float:
+## O `* delta` é obrigatório: sem ele a gravidade entrava como +980 inteiro a
+## cada frame em vez de +980/60, e um pulo de -1010 virava -30 — o impulso era
+## quase todo cancelado no mesmo frame. É por isso que o pulo "não saía".
+func _step_gravity(delta: float) -> float:
 	var g := _gravity()
 	if velocity.y < 0.0 and absf(velocity.y) < APEX_VELOCITY_THRESHOLD:
-		return g * APEX_GRAVITY_SCALE
-	return g
+		g *= APEX_GRAVITY_SCALE
+	return g * delta
 
 
 func _check_landing() -> void:

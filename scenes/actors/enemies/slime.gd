@@ -4,7 +4,12 @@ extends Enemy
 ## As unicas diferencas sao o override de [method _apply_vertical] (pula em
 ## vez de andar) e o amortecimento visual do pouso.
 
-@export var hop_power := -620.0
+## Impulso do salto. Sem gravidade reduzida no apice (o slime nao tem
+## APEX_GRAVITY_SCALE), -300 contra 980 da ~46 px -- quase a propria altura do
+## corpo. Suficiente para parecer saltitante sem virar pulo do jogador.
+@export var hop_power := -300.0
+## Intervalo entre saltinhos. Maior que o do jogador para o ritmo nao
+## confunda com o pulo do player.
 @export var hop_cooldown := 0.85
 
 var _hop_timer := 0.0
