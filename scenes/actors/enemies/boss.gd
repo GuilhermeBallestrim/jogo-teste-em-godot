@@ -1,3 +1,4 @@
+class_name Boss
 extends Enemy
 ## Boss: inimigo final com padroes de ataque.
 ##
@@ -22,6 +23,7 @@ var _slam_done := false
 func _ready() -> void:
 	body_color = Color(0.55, 0.2, 0.55)
 	super._ready()
+	Music.play(-10.0, &"boss")
 	max_health = 20
 	health = max_health
 	detect_range = 9999.0

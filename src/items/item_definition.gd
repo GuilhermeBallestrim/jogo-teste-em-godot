@@ -1,39 +1,45 @@
 class_name ItemDefinition
 extends Resource
-## Definição de um item: o que ele é e o que fazer quando o jogador usa.
+## Defini��o de um item: o que ele � e o que fazer quando o jogador usa.
 ##
-## `Resource` e não um `Dictionary` solto porque dá para salvar, comparar por
-## identidade e -- quando vier arte -- apontar para um ícone sem mudar quem
-## chama. As instâncias reais nascem em código, em [ItemLibrary]: o projeto
-## não tem pasta de assets e um `.tres` por item seria um arquivo para cada
+## `Resource` e n�o um `Dictionary` solto porque d� para salvar, comparar por
+## identidade e -- quando vier arte -- apontar para um �cone sem mudar quem
+## chama. As inst�ncias reais nascem em c�digo, em [ItemLibrary]: o projeto
+## n�o tem pasta de assets e um `.tres` por item seria um arquivo para cada
 ## linha de dado.
 
 enum Effect {
-	## Só conta. Não faz nada quando usado.
+	## S� conta. N�o faz nada quando usado.
 	NONE,
 	## Cura o jogador em [member heal_amount].
 	HEAL,
 	## Soma pontos no [GameState].
 	POINTS,
+	## Dano radial ao redor do jogador.
+	BOMB,
+	## Invulnerabilidade por 3 s.
+	SHIELD,
+	## Atrai moedas num raio por 5 s.
+	MAGNET,
 }
 
-## Identificador estável, gravado no save. Não é o `display_name`: renomear o
-## texto de um item não pode invalidar o progresso de quem já o tinha.
+## Identificador est�vel, gravado no save. N�o � o `display_name`: renomear o
+## texto de um item n�o pode invalidar o progresso de quem j� o tinha.
 @export var id: StringName = &""
 ## O que aparece na HUD.
 @export var display_name := ""
-## Cor do ícone desenhado em código.
+## Cor do �cone desenhado em c�digo.
 @export var tint := Color.WHITE
 ## Quanto o [GameState] ganha ao coletar.
 @export var value := 0
 @export var effect: Effect = Effect.NONE
-## Só faz sentido para [constant Effect.HEAL].
+## S� faz sentido para [constant Effect.HEAL].
 @export var heal_amount := 0
 
 
 
 ## O item tem tudo o que o save precisa. Ver [member id] sobre por que isto
-## não vive em `_init()`.
+## n�o vive em `_init()`.
 func is_valid() -> bool:
 	return id != &"" and not display_name.is_empty()
 
@@ -44,7 +50,7 @@ func has_use() -> bool:
 
 ## Aplica o efeito. `game_state` e `player` chegam prontos, em vez de vir dos
 ## autoloads: um `Resource` de dado que puxa `GameState` deixa de ser dado e
-## vira um nó do jogo -- e é o que faz o runner de testes não conseguir
+## vira um n� do jogo -- e � o que faz o runner de testes n�o conseguir
 ## carregar esta classe antes dos autoloads existirem.
 func apply(game_state: Node, player: Node = null) -> void:
 	if game_state == null:
@@ -55,6 +61,15 @@ func apply(game_state: Node, player: Node = null) -> void:
 			game_state.call(&"heal", heal_amount)
 		Effect.POINTS:
 			game_state.call(&"add_score", value)
+		Effect.BOMB:
+			if player != null and player.has_method(&"do_bomb"):
+				player.call(&"do_bomb")
+		Effect.SHIELD:
+			if player != null and player.has_method(&"activate_shield"):
+				player.call(&"activate_shield")
+		Effect.MAGNET:
+			if player != null and player.has_method(&"activate_magnet"):
+				player.call(&"activate_magnet")
 		Effect.NONE:
 			return
 	# O `Player.on_item_used()` e o gancho de som; nao chamamos `heal()` dele
@@ -70,4 +85,10 @@ func effect_hint() -> String:
 			return "+%d de vida" % heal_amount
 		Effect.POINTS:
 			return "+%d de pontos" % value
+		Effect.BOMB:
+			return "Dano radial"
+		Effect.SHIELD:
+			return "Invulneravel por 3s"
+		Effect.MAGNET:
+			return "Atrai moedas"
 	return ""

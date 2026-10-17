@@ -26,6 +26,9 @@ const SCENES := [
 	"res://scenes/actors/enemies/bomber.tscn",
 	"res://scenes/actors/enemies/guard.tscn",
 	"res://scenes/actors/enemies/boss.tscn",
+	"res://scenes/actors/enemies/shield.tscn",
+	"res://scenes/actors/enemies/teleporter.tscn",
+	"res://scenes/actors/enemies/mini_boss.tscn",
 	"res://scenes/props/projectile.tscn",
 	"res://scenes/props/coin.tscn",
 	"res://scenes/props/checkpoint.tscn",
@@ -822,6 +825,9 @@ const CRAWLER_SCENE := "res://scenes/actors/enemies/crawler.tscn"
 const BOMBER_SCENE := "res://scenes/actors/enemies/bomber.tscn"
 const GUARD_SCENE := "res://scenes/actors/enemies/guard.tscn"
 const BOSS_SCENE := "res://scenes/actors/enemies/boss.tscn"
+const SHIELD_SCENE := "res://scenes/actors/enemies/shield.tscn"
+const TELEPORTER_SCENE := "res://scenes/actors/enemies/teleporter.tscn"
+const MINI_BOSS_SCENE := "res://scenes/actors/enemies/mini_boss.tscn"
 
 
 ## Voador: a prova de que a arquitetura aceita variacao. Se o [Enemy]

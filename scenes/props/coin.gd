@@ -47,5 +47,6 @@ func _on_body_entered(body: Node2D) -> void:
 	GameState.add_score(100 * value)
 	# Moeda cara soa mais alto: dá para o ouvido dizer que pegou algo melhor.
 	Sfx.play(&"coin", -5.0 + minf(float(value - 1) * 3.0, 6.0))
+	ParticlePreset.spawn_coin_burst(get_tree().current_scene, global_position)
 	collected.emit(value)
 	queue_free()

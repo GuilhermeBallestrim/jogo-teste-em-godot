@@ -117,6 +117,38 @@ static func burst(node: CPUParticles2D, tint: Color) -> CPUParticles2D:
 ## junto, e o jogador veria a explosao engolir.
 ## [param parent] Onde pendurar. A cena corrente quando existir, senão o
 ## próprio nó -- um emissor solto não serve para nada.
+## Estouro de moeda: dourado, radial, curto.
+static func coin_burst(node: CPUParticles2D) -> CPUParticles2D:
+	_one_shot(node)
+	node.amount = 16
+	node.lifetime = 0.4
+	node.direction = Vector2(0, -1)
+	node.spread = 180.0
+	node.gravity = Vector2(0, 200)
+	node.initial_velocity_min = 60.0
+	node.initial_velocity_max = 180.0
+	node.scale_amount_min = 2.0
+	node.scale_amount_max = 4.0
+	node.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	node.emission_sphere_radius = 4.0
+	_tint(node, Color(0.976, 0.831, 0.376), 0.95)
+	return node
+
+## Cria e solta um estouro de moeda.
+static func spawn_coin_burst(parent: Node, world_position: Vector2) -> CPUParticles2D:
+	if parent == null or not parent.is_inside_tree():
+		return null
+	var layer: Node = parent.get_tree().current_scene
+	if layer == null:
+		layer = parent
+	var node := CPUParticles2D.new()
+	coin_burst(node)
+	node.z_index = 35
+	layer.add_child(node)
+	node.global_position = world_position
+	node.emitting = true
+	return node
+
 static func spawn_burst(parent: Node, world_position: Vector2, tint: Color, count: int = 20) -> CPUParticles2D:
 	if parent == null or not parent.is_inside_tree():
 		return null

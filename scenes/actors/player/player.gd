@@ -61,6 +61,8 @@ var _dash_timer := 0.0
 var _dash_cooldown := 0.0
 var _dash_direction := Vector2.RIGHT
 
+var _magnet_timer := 0.0
+var _shield_timer := 0.0
 var _parry_timer := 0.0
 var _heavy_charging := false
 var _heavy_charge := 0.0
@@ -143,6 +145,7 @@ func _physics_process(delta: float) -> void:
 	_update_facing(input_dir)
 	_check_landing()
 	_update_particles()
+	_update_magnet()
 
 
 func _process(delta: float) -> void:
@@ -236,8 +239,7 @@ func _process_jump() -> void:
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
 		Sfx.play(&"jump", -5.0)
-	# Pulo duplo: so se a habilidade estiver desbloqueada e o corpo estiver
-	# no ar sem ter usado o segundo salto ainda.
+	# Pulo duplo:
 	elif _jump_buffer_timer > 0.0 and not is_on_floor() and _double_jump_available:
 		velocity.y = JUMP_VELOCITY * 0.85
 		_jump_buffer_timer = 0.0
@@ -326,6 +328,17 @@ func _check_landing() -> void:
 ## Ficam juntos e nao nas tres funcois que os disparam porque os tres leem o
 ## mesmo par de condicoes: "esta no chao" e "esta rapido". Espalhado pelo
 ## arquivo, viraria mais um lugar para esquecer de ligar particula.
+func _update_magnet() -> void:
+	if _magnet_timer <= 0.0:
+		return
+	for node in get_tree().get_nodes_in_group(&"coins"):
+		var coin := node as Node2D
+		if coin == null:
+			continue
+		if global_position.distance_to(coin.global_position) <= 180.0:
+			coin.global_position = coin.global_position.move_toward(global_position, 300.0 * get_physics_process_delta_time())
+
+
 func _update_particles() -> void:
 	var dashing := is_dashing()
 	# Poeira so no chao: no ar ela nao tem nem chao para levantar.
@@ -350,6 +363,8 @@ func _tick_timers(delta: float) -> void:
 			_hitbox.deactivate()
 
 	_parry_timer = maxf(_parry_timer - delta, 0.0)
+	_magnet_timer = maxf(_magnet_timer - delta, 0.0)
+	_shield_timer = maxf(_shield_timer - delta, 0.0)
 
 func _update_facing(input_dir: Vector2) -> void:
 	if input_dir.x != 0.0:
@@ -411,6 +426,30 @@ func _release_attack() -> void:
 	_heavy_charge = 0.0
 
 
+func do_bomb() -> void:
+	for node in get_tree().get_nodes_in_group(&"enemies"):
+		var enemy := node as Node2D
+		if enemy == null:
+			continue
+		if global_position.distance_to(enemy.global_position) <= 120.0:
+			var dir := (enemy.global_position - global_position).normalized()
+			if enemy.has_method(&"apply_damage"):
+				enemy.call(&"apply_damage", 2, self, dir, 200.0)
+	ParticlePreset.spawn_burst(get_tree().current_scene, global_position, Color(1.0, 0.6, 0.2), 30)
+	Hitstop.trigger(3)
+	_camera_shake.shake_for(0.8)
+
+
+func activate_shield() -> void:
+	_shield_timer = 3.0
+	Sfx.play(&"select", -4.0)
+
+
+func activate_magnet() -> void:
+	_magnet_timer = 5.0
+	Sfx.play(&"select", -4.0)
+
+
 func _try_attack() -> void:
 	if _dead or _attack_cooldown > 0.0:
 		return
@@ -431,6 +470,14 @@ func _try_attack() -> void:
 ## Chamado pela [Hurtbox] quando uma hitbox ativa encosta neste corpo.
 func apply_damage(amount: int, source: Node, direction: Vector2, knockback: float) -> void:
 	if _dead or _invuln_timer > 0.0:
+		return
+
+	# Escudo ativo: nega o dano.
+	if _shield_timer > 0.0:
+		_shield_timer = 0.0
+		Hitstop.trigger(2)
+		_camera_shake.shake_for(0.3)
+		FloatingNumber.spawn(get_tree().current_scene, global_position, 0, Color(0.4, 0.8, 1.0))
 		return
 
 	# Parry: dentro da janela, o golpe nao tira vida e devolve o stagger

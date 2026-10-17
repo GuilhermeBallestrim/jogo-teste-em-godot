@@ -28,20 +28,20 @@ const PROGRESSION := [
 	["G2", ["B3", "D4", "G3"]],
 ]
 
-static var _cache: AudioStreamWAV = null
+static var _cache: Dictionary = {}
 
 
 ## Libera a trilha sintetizada. O [Audio] chama isso ao encerrar para nao
 ## deixar o AudioStreamWAV pendurado na saida do jogo.
 static func clear_cache() -> void:
-	_cache = null
+	_cache.clear()
 
 
-static func play(volume_db: float = -8.0) -> void:
+static func play(volume_db: float = -8.0, track: StringName = &"default") -> void:
 	var audio := AudioManager.instance
 	if audio == null or not audio.music_enabled:
 		return
-	audio.play_music(get_stream(), 0.8)
+	audio.play_music(get_stream(track), 0.8)
 
 
 static func stop() -> void:
@@ -51,9 +51,9 @@ static func stop() -> void:
 	audio.stop_music(0.8)
 
 
-static func get_stream() -> AudioStreamWAV:
-	if _cache != null:
-		return _cache
+static func get_stream(track: StringName = &"default") -> AudioStreamWAV:
+	if _cache.has(track):
+		return _cache[track] as AudioStreamWAV
 
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
@@ -61,17 +61,18 @@ static func get_stream() -> AudioStreamWAV:
 	stream.stereo = false
 	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 
-	var buffer := _mix()
+	var buffer := _mix(track)
 	stream.data = buffer
 	stream.loop_begin = 0
 	stream.loop_end = int(buffer.size() / 2)
 
-	_cache = stream
+	_cache[track] = stream
 	return stream
 
 
-static func _mix() -> PackedByteArray:
-	var beat := 60.0 / BPM
+static func _mix(track: StringName) -> PackedByteArray:
+	var bpm := 110.0 if track == &"default" else 140.0
+	var beat := 60.0 / bpm
 	var bar := beat * BEATS_PER_BAR
 	var total_seconds := bar * BARS
 	var frames := int(MIX_RATE * total_seconds)

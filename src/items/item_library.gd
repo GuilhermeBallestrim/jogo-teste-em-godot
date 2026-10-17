@@ -38,6 +38,26 @@ static func _build() -> void:
 		d.tint = Color(0.784, 0.867, 0.941)
 		d.value = 0
 	)
+	_add(&"bomb", func(d: ItemDefinition) -> void:
+		d.display_name = "Bomba"
+		d.tint = Color(1.0, 0.6, 0.2)
+		d.value = 0
+		d.effect = ItemDefinition.Effect.BOMB
+	)
+
+	_add(&"shield", func(d: ItemDefinition) -> void:
+		d.display_name = "Escudo"
+		d.tint = Color(0.4, 0.8, 1.0)
+		d.value = 0
+		d.effect = ItemDefinition.Effect.SHIELD
+	)
+
+	_add(&"magnet", func(d: ItemDefinition) -> void:
+		d.display_name = "Ima"
+		d.tint = Color(0.9, 0.4, 0.9)
+		d.value = 0
+		d.effect = ItemDefinition.Effect.MAGNET
+	)
 
 
 static func _add(id: StringName, fill: Callable) -> void:
