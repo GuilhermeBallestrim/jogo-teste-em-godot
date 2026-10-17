@@ -37,6 +37,14 @@ func _ready() -> void:
 	GameState.load_progress()
 	_build_slot_list()
 	_build_level_list()
+	# Guia rapido de controles.
+	var guide := Label.new()
+	guide.text = "A/D mover  |  W/Espaco pular  |  Shift dash  |  Mouse atacar  |  Q aparar  |  E usar item  |  Esc pausa"
+	guide.add_theme_font_size_override("font_size", 12)
+	guide.add_theme_color_override("font_color", Color(0.55, 0.62, 0.72))
+	guide.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_level_list.get_parent().add_child(guide)
+	_level_list.get_parent().move_child(guide, _level_list.get_index())
 	_version.text = "Godot %s" % Engine.get_version_info()["string"]
 
 	_play.grab_focus()
@@ -183,7 +191,14 @@ func _on_play() -> void:
 	GameState.reset()
 	# "Jogar" sempre vai para a primeira fase -- e o botao de inicio, nao um
 	# atalho para a ultima jogada. Para escolher, use a lista abaixo.
+	# "Jogar" vai para a primeira fase desbloqueada, nao sempre a 1.
 	var first := LevelRegistry.default_id()
+	for id: StringName in LevelRegistry.all_ids():
+		if id == &"main_menu":
+			continue
+		if GameState.is_level_unlocked(id):
+			first = id
+			break
 	SceneRouter.goto(LevelRegistry.path_for(first), first)
 
 

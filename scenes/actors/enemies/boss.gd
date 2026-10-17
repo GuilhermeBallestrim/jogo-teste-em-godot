@@ -14,7 +14,7 @@ const PROJECTILE_SCENE := "res://scenes/props/projectile.tscn"
 @export var slam_radius := 180.0
 @export var slam_damage := 2
 @export var barrage_count := 5
-@export var charge_speed := 420.0
+@export var charge_speed := 280.0
 
 var _pattern := 0
 var _vulnerable_timer := 0.0
@@ -23,7 +23,6 @@ var _slam_done := false
 func _ready() -> void:
 	body_color = Color(0.55, 0.2, 0.55)
 	super._ready()
-	Music.play(-10.0, &"boss")
 	max_health = 20
 	health = max_health
 	detect_range = 9999.0
@@ -32,8 +31,27 @@ func _ready() -> void:
 	chase_speed = 0.0
 	patrol_speed = 0.0
 	leash_radius = 0.0
-	# O boss nao patrulha: fica no posto.
+	Music.play(-10.0, &"boss")
 	_set_state(State.IDLE)
+
+
+func _set_state(next: State) -> void:
+	super._set_state(next)
+	_update_boss_visual()
+
+
+func _update_boss_visual() -> void:
+	match state:
+		State.IDLE:
+			_sprite.color = body_color
+		State.ATTACK, State.AIM, State.CHASE:
+			_sprite.color = body_color.lerp(Color(1.0, 0.3, 0.3), 0.5)
+		State.VULNERABLE:
+			_sprite.color = Color(0.3, 0.9, 0.4)
+		State.STAGGER:
+			_sprite.color = body_color.lerp(Color(0.5, 0.5, 0.5), 0.5)
+		State.DEAD:
+			pass
 
 
 func _think(delta: float) -> void:
@@ -43,23 +61,20 @@ func _think(delta: float) -> void:
 			if _state_timer >= 1.2:
 				_start_next_pattern()
 		State.ATTACK:
-			# SLAM: onda de choque radial.
 			_stop(delta, 1400.0)
 			if _state_timer >= 0.1 and not _slam_done:
 				_slam_done = true
 				_do_slam()
 			if _state_timer >= 0.6:
 				_set_state(State.VULNERABLE)
-				_vulnerable_timer = 2.0
+				_vulnerable_timer = 3.0
 		State.AIM:
-			# BARRAGE: rajada de projeteis.
 			_stop(delta, 900.0)
 			if _state_timer >= 0.8:
 				_do_barrage()
 				_set_state(State.VULNERABLE)
-				_vulnerable_timer = 2.0
+				_vulnerable_timer = 3.0
 		State.CHASE:
-			# CHARGE: carga em direcao ao jogador.
 			if _target != null:
 				var to_target := _target.global_position.x - global_position.x
 				_facing = signf(to_target) if to_target != 0.0 else _facing
@@ -67,7 +82,7 @@ func _think(delta: float) -> void:
 			if _state_timer >= 0.7:
 				velocity = Vector2.ZERO
 				_set_state(State.VULNERABLE)
-				_vulnerable_timer = 1.5
+				_vulnerable_timer = 2.5
 		State.VULNERABLE:
 			_stop(delta, 600.0)
 			_vulnerable_timer -= delta
@@ -77,6 +92,11 @@ func _think(delta: float) -> void:
 			_stop(delta, 800.0)
 			if _state_timer >= 0.6:
 				_set_state(State.IDLE)
+		State.DEAD:
+			pass
+		State.PATROL:
+			pass
+
 
 func _start_next_pattern() -> void:
 	_pattern = (_pattern + 1) % 3
@@ -91,7 +111,6 @@ func _start_next_pattern() -> void:
 
 
 func _do_slam() -> void:
-	# Onda de choque radial: dano ao jogador se estiver no raio.
 	var players := get_tree().get_nodes_in_group(&"player")
 	for node in players:
 		var body := node as Node2D
@@ -101,7 +120,6 @@ func _do_slam() -> void:
 			var direction := (body.global_position - global_position).normalized()
 			if body.has_method(&"apply_damage"):
 				body.call(&"apply_damage", slam_damage, self, direction, 300.0)
-	# Particulas de impacto.
 	ParticlePreset.spawn_burst(get_tree().current_scene, global_position, body_color, 40)
 	Hitstop.trigger(4)
 	_camera_shake_for_boss()
@@ -131,7 +149,6 @@ func _do_barrage() -> void:
 
 
 func _camera_shake_for_boss() -> void:
-	# O boss tem sua propria camera shake (mais forte).
 	for node in get_tree().get_nodes_in_group(&"player"):
 		var body := node as Node2D
 		if body == null:
@@ -144,13 +161,10 @@ func _camera_shake_for_boss() -> void:
 func apply_damage(amount: int, source: Node, direction: Vector2, knockback: float) -> void:
 	if state == State.DEAD:
 		return
-	# So toma dano durante VULNERABLE.
 	if state != State.VULNERABLE:
-		# Flash de "nao afeta".
 		_flash()
 		return
 	super.apply_damage(amount, source, direction, knockback)
-	# Knockback reduzido: o boss nao deve ser empurrado para fora da arena.
 	velocity *= 0.3
 
 
