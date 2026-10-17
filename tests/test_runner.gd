@@ -183,6 +183,8 @@ func _run_unit_tests() -> void:
 	await _test_levels_keep_enemies()
 	await _test_menu_lists_every_level()
 	await _test_player_rig_poses()
+	await _test_parry()
+	_test_session_stats()
 	await _test_camera_look()
 	_test_hitstop()
 	await _test_combat_feedback()
@@ -1892,6 +1894,86 @@ func _test_guard_stands_post() -> void:
 
 	arena.dispose()
 	await process_frame
+## Stats de sessao: tempo, mortes, moedas e nota.
+func _test_session_stats() -> void:
+	_begin("SessionStats: estatisticas de tentativa")
+
+	var s := SessionStats.new()
+	s.start(&"level_01", 12)
+	_check(s.level_id == &"level_01", "guarda o id da fase")
+	_check(s.coins_total == 12, "guarda o total de moedas")
+
+	s.record_death()
+	s.record_death()
+	_check_eq(s.deaths, 2, "conta mortes")
+
+	s.record_coins(5)
+	s.record_coins(3)
+	_check_eq(s.coins_collected, 8, "acumula moedas")
+
+	s.record_damage_dealt(10)
+	s.record_damage_taken(4)
+	_check_eq(s.damage_dealt, 10, "dano causado")
+	_check_eq(s.damage_taken, 4, "dano recebido")
+
+	# Nota C: derrota sem progresso.
+	var sc := SessionStats.new()
+	sc.start(&"level_01", 12)
+	_check_eq(sc.grade(), "C", "derrota sem progresso = C")
+
+	# Nota B: derrota com progresso.
+	s.record_coins(1)
+	_check_eq(s.grade(), "B", "derrota com progresso = B")
+
+	# Vitoria com mortes = B.
+	s.finish(true)
+	_check_eq(s.grade(), "B", "vitoria com 2 mortes = B")
+
+	# S: sem mortes, todas as moedas, dentro do par.
+	var s2 := SessionStats.new()
+	s2.start(&"level_01", 8)
+	s2.record_coins(8)
+	s2.finish(true)
+	_check_eq(s2.grade(999.0), "S", "vitoria perfeita = S")
+
+	# A: vitoria com 1 morte.
+	var s3 := SessionStats.new()
+	s3.start(&"level_01", 8)
+	s3.record_death()
+	s3.record_coins(8)
+	s3.finish(true)
+	_check_eq(s3.grade(999.0), "A", "vitoria com 1 morte = A")
+
+	# coins_per_second nao divide por zero.
+	var s4 := SessionStats.new()
+	s4.start(&"x", 0)
+	_check(s4.coins_per_second() >= 0.0, "coins_per_second nao quebra com tempo zero")
+
+	# finish e idempotente.
+	s2.finish(true)
+	_check(s2.victory, "finish de novo nao desfaz a vitoria")
+
+
+func _test_parry() -> void:
+	_begin("Player: parry")
+
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(true, SLIME_SCENE)
+	await process_frame
+	arena.enemy.global_position = Vector2(120, 0)
+	arena.player.global_position = Vector2(0, 0)
+	await process_frame
+
+	arena.player.call(&"_try_parry")
+	var health_before: int = int(_gs.get(&"health"))
+	arena.player.call(&"apply_damage", 1, arena.enemy, Vector2.RIGHT, 100.0)
+	_check_eq(int(_gs.get(&"health")), health_before, "parry anula o dano")
+
+	arena.dispose()
+	await process_frame
+
+
 func _free_all_scenes() -> void:
 	for node in _spawned:
 		if is_instance_valid(node):

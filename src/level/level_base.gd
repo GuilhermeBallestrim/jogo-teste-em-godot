@@ -38,14 +38,25 @@ var is_finished := false
 var _pause_menu: PauseMenu = null
 var _end_screen: EndScreen = null
 
+## Estatisticas da tentativa em andamento.
+var _stats: SessionStats = null
+## Moedas no GameState quando a fase comecou: o delta e o que esta fase
+## rendeu, sem depender do historico.
+var _coins_at_start: int = 0
+
 
 func _ready() -> void:
+	_stats = SessionStats.new()
+	_stats.start(_level_id(), count_remaining_value())
+
 	if reset_state_on_enter:
 		GameState.reset()
 	_apply_camera_limits()
+	_coins_at_start = GameState.coins
 	_hud.set_coin_goal(coins_to_win)
 	_check_goal_is_reachable()
 	_check_kill_zone_covers_bounds()
+	_player.died.connect(func() -> void: if _stats != null: _stats.record_death())
 	_player.died.connect(_on_player_died)
 	Music.play()
 
@@ -137,12 +148,21 @@ func _kill_zone_half_width(kill_zone: Node2D) -> float:
 # ------------------------------------------------------------------ fluxo
 
 
+## Id da fase atual, para as estatisticas. Subclasses declaram `LEVEL_ID`;
+## se nao declararem, usamos o nome do arquivo.
+func _level_id() -> StringName:
+	return StringName(scene_file_path.get_file().get_basename())
+
+
 func _win() -> void:
 	if is_finished:
 		return
 	is_finished = true
 	Sfx.play(&"victory")
 	Music.stop()
+	if _stats != null:
+		_stats.finish(true)
+		_stats.coins_collected = GameState.coins - _coins_at_start
 	_show_end_screen(true)
 
 
@@ -154,12 +174,17 @@ func _on_player_died() -> void:
 	await get_tree().create_timer(1.0).timeout
 	if not is_inside_tree():
 		return
+	if _stats != null:
+		_stats.finish(false)
+		_stats.coins_collected = GameState.coins - _coins_at_start
 	_show_end_screen(false)
 
 
 func _show_end_screen(victory: bool) -> void:
 	_end_screen = load(END_SCREEN_SCENE).instantiate()
 	_end_screen.configure(victory)
+	if _stats != null and _end_screen.has_method("set_stats"):
+		_end_screen.set_stats(_stats)
 	add_child(_end_screen)
 	_end_screen.restart_requested.connect(_restart)
 	_end_screen.menu_requested.connect(_go_to_menu)

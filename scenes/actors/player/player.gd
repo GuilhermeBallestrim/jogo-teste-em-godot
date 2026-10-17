@@ -34,6 +34,12 @@ const ATTACK_COOLDOWN := PlayerTuning.ATTACK_COOLDOWN
 const ATTACK_ACTIVE_TIME := PlayerTuning.ATTACK_ACTIVE_TIME
 const ATTACK_DAMAGE := PlayerTuning.ATTACK_DAMAGE
 const ATTACK_REACH := PlayerTuning.ATTACK_REACH
+const HEAVY_CHARGE_TIME := 0.28
+const HEAVY_DAMAGE := 3
+const HEAVY_ACTIVE_TIME := 0.22
+const AIR_ATTACK_DAMAGE := 2
+const AIR_ATTACK_ACTIVE_TIME := 0.16
+const PARRY_WINDOW := 0.18
 const IFRAME_TIME := PlayerTuning.IFRAME_TIME
 const HURT_KNOCKBACK := PlayerTuning.HURT_KNOCKBACK
 const DEFAULT_GRAVITY := PlayerTuning.DEFAULT_GRAVITY
@@ -53,6 +59,10 @@ var _jump_buffer_timer := 0.0
 var _dash_timer := 0.0
 var _dash_cooldown := 0.0
 var _dash_direction := Vector2.RIGHT
+
+var _parry_timer := 0.0
+var _heavy_charging := false
+var _heavy_charge := 0.0
 
 var _attack_timer := 0.0
 var _attack_cooldown := 0.0
@@ -107,6 +117,7 @@ func _on_attack_connected(_hurtbox: Area2D) -> void:
 
 func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
+	_update_heavy_charge(delta)
 
 	if _dead:
 		velocity.y += _step_gravity(delta) * gravity_scale
@@ -229,13 +240,17 @@ func _process_jump() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"jump"):
 		_jump_buffer_timer = JUMP_BUFFER
+	elif event.is_action_released(&"attack"):
+		_release_attack()
 	elif event.is_action_released(&"jump") and velocity.y < 0.0:
 		# Soltar o botao mais cedo corta o pulo (altura variável).
 		velocity.y *= JUMP_CUT
 	elif event.is_action_pressed(&"attack"):
-		_try_attack()
+		_start_heavy_charge()
 	elif event.is_action_pressed(&"interact"):
 		try_use_item()
+	elif event.is_action_pressed(&"parry"):
+		_try_parry()
 
 
 ## Consome o primeiro item com efeito. `interact` estava no Input Map sem
@@ -324,6 +339,7 @@ func _tick_timers(delta: float) -> void:
 		if _attack_timer <= 0.0:
 			_hitbox.deactivate()
 
+	_parry_timer = maxf(_parry_timer - delta, 0.0)
 
 func _update_facing(input_dir: Vector2) -> void:
 	if input_dir.x != 0.0:
@@ -337,19 +353,88 @@ func _update_facing(input_dir: Vector2) -> void:
 # --------------------------------------------------------------- combate
 
 
+func _update_heavy_charge(delta: float) -> void:
+	if not _heavy_charging:
+		return
+	_heavy_charge += delta
+	if _heavy_charge >= HEAVY_CHARGE_TIME:
+		_heavy_charging = false
+		_fire_heavy()
+		_heavy_charge = 0.0
+
+
+func _fire_heavy() -> void:
+	if _dead or _attack_cooldown > 0.0:
+		return
+	_attack_cooldown = ATTACK_COOLDOWN * 1.4
+	_attack_timer = HEAVY_ACTIVE_TIME
+	_hitbox.damage = HEAVY_DAMAGE
+	_hitbox.position.y = 0.0
+	_hitbox.activate()
+	Sfx.play(&"swing", -4.0)
+
+
+func _try_parry() -> void:
+	if _dead:
+		return
+	_parry_timer = PARRY_WINDOW
+	Sfx.play(&"select", -6.0)
+
+
+func _start_heavy_charge() -> void:
+	if _dead or _attack_cooldown > 0.0 or not is_on_floor():
+		if not is_on_floor():
+			_try_attack()
+		return
+	_heavy_charging = true
+	_heavy_charge = 0.0
+
+
+func _release_attack() -> void:
+	if not _heavy_charging:
+		return
+	_heavy_charging = false
+	if _heavy_charge >= HEAVY_CHARGE_TIME:
+		_fire_heavy()
+	else:
+		_try_attack()
+	_heavy_charge = 0.0
+
+
 func _try_attack() -> void:
 	if _dead or _attack_cooldown > 0.0:
 		return
 	_attack_cooldown = ATTACK_COOLDOWN
-	_attack_timer = ATTACK_ACTIVE_TIME
+	if not is_on_floor():
+		_attack_timer = AIR_ATTACK_ACTIVE_TIME
+		_hitbox.damage = AIR_ATTACK_DAMAGE
+		_hitbox.position.y = 18.0
+	else:
+		_attack_timer = ATTACK_ACTIVE_TIME
+		_hitbox.damage = ATTACK_DAMAGE
+		_hitbox.position.y = 0.0
 	_hitbox.activate()
 	Sfx.play(&"swing", -8.0)
+
 
 
 ## Chamado pela [Hurtbox] quando uma hitbox ativa encosta neste corpo.
 func apply_damage(amount: int, source: Node, direction: Vector2, knockback: float) -> void:
 	if _dead or _invuln_timer > 0.0:
 		return
+
+	# Parry: dentro da janela, o golpe nao tira vida e devolve o stagger
+	# para quem atacou. E o mesmo caminho de dano, so que o dano vira zero
+	# e o atacante perde.
+	if _parry_timer > 0.0:
+		_parry_timer = 0.0
+		Hitstop.trigger(3)
+		_camera_shake.shake_for(0.6)
+		FloatingNumber.spawn(get_tree().current_scene, global_position, 0, Color(0.6, 1.0, 0.9))
+		if source != null and source.has_method("apply_damage"):
+			source.call("apply_damage", 0, self, -Vector2.ONE, 0.0)
+		return
+
 
 	_invuln_timer = IFRAME_TIME
 	_hurtbox.invulnerable = true

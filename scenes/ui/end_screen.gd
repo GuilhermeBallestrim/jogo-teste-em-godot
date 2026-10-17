@@ -10,6 +10,8 @@ signal menu_requested
 
 @onready var _title: Label = %TitleLabel
 @onready var _subtitle: Label = %SubtitleLabel
+var _session: SessionStats = null
+
 @onready var _stats: Label = %StatsLabel
 @onready var _restart: Button = %RestartButton
 @onready var _menu: Button = %MenuButton
@@ -17,6 +19,14 @@ signal menu_requested
 
 func configure(victory: bool) -> void:
 	is_victory = victory
+
+## Recebe as estatisticas da tentativa. Pode ser chamado antes ou depois de
+## `_ready` (a fase chama antes de adicionar a cena).
+func set_stats(stats: SessionStats) -> void:
+	_session = stats
+	if is_inside_tree():
+		_refresh_stats()
+
 
 
 func _ready() -> void:
@@ -44,7 +54,11 @@ func _ready() -> void:
 
 
 func _refresh_stats() -> void:
-	_stats.text = "Moedas: %d        Pontos: %d" % [GameState.coins, GameState.score]
+	var base := "Moedas: %d        Pontos: %d" % [GameState.coins, GameState.score]
+	if _session != null:
+		_stats.text = "%s\n%s" % [base, _session.summary()]
+	else:
+		_stats.text = base
 
 
 func _on_coins_changed(_amount: int) -> void:

@@ -9,6 +9,7 @@ const OPTIONS_SCENE := "res://scenes/ui/options_panel.tscn"
 const LEVEL_LABELS := {
 	&"level_01": "1 - Corredores",
 	&"level_02": "2 - Torres",
+	&"level_03": "3 - Misto",
 }
 
 @onready var _play: Button = %PlayButton
@@ -21,6 +22,8 @@ const LEVEL_LABELS := {
 
 var _options_panel: OptionsPanel = null
 var _level_buttons: Array[Button] = []
+var _slot_list: VBoxContainer = null
+var _slot_buttons: Array[Button] = []
 
 
 func _ready() -> void:
@@ -31,11 +34,91 @@ func _ready() -> void:
 
 	_quit.visible = not OS.has_feature("web")
 	_refresh_save_state()
+	_build_slot_list()
 	_build_level_list()
 	_version.text = "Godot %s" % Engine.get_version_info()["string"]
 
 	_play.grab_focus()
 	Music.play()
+
+
+## Lista de slots de save. O jogador escolhe em qual slot jogar; o ativo
+## fica marcado. "Novo slot" cria um com nome sequencial.
+func _build_slot_list() -> void:
+	if _slot_list == null:
+		_slot_list = VBoxContainer.new()
+		_slot_list.name = "SlotList"
+		_level_list.get_parent().add_child(_slot_list)
+		_level_list.get_parent().move_child(_slot_list, _level_list.get_index())
+
+	for child in _slot_list.get_children():
+		child.queue_free()
+	_slot_buttons.clear()
+
+	var slots := Save.list_slots()
+	if slots.is_empty():
+		slots = PackedStringArray(["main"])
+
+	for slot_name in slots:
+		var slot := StringName(slot_name)
+		var is_active := slot == Save.active_slot
+		var label := slot_name
+		if is_active:
+			label += "  (ativo)"
+		if Save.has_save(slot):
+			var id := Save.peek_level_id(slot)
+			if id != &"":
+				label += "  - %s" % id
+
+		var row := HBoxContainer.new()
+		var button := Button.new()
+		button.text = label
+		button.custom_minimum_size = Vector2(200, 0)
+		button.pressed.connect(_on_slot_pressed.bind(slot))
+		row.add_child(button)
+		_slot_buttons.append(button)
+
+		var erase := Button.new()
+		erase.text = "x"
+		erase.custom_minimum_size = Vector2(32, 0)
+		erase.pressed.connect(_on_slot_erase.bind(slot))
+		row.add_child(erase)
+
+		_slot_list.add_child(row)
+
+	var new_button := Button.new()
+	new_button.text = "+ Novo slot"
+	new_button.custom_minimum_size = Vector2(260, 0)
+	new_button.pressed.connect(_on_new_slot)
+	_slot_list.add_child(new_button)
+
+
+func _on_slot_pressed(slot: StringName) -> void:
+	Sfx.play(&"select")
+	Save.set_active_slot(slot)
+	_refresh_save_state()
+	_build_level_list()
+	_build_slot_list()
+
+
+func _on_slot_erase(slot: StringName) -> void:
+	Sfx.play(&"back")
+	Save.erase_save(slot)
+	if slot == Save.active_slot:
+		Save.set_active_slot(&"main")
+	_build_slot_list()
+	_refresh_save_state()
+	_build_level_list()
+
+
+func _on_new_slot() -> void:
+	Sfx.play(&"select")
+	var n := Save.list_slots().size() + 1
+	var name := "slot_%d" % n
+	Save.set_active_slot(StringName(name))
+	_build_slot_list()
+	_refresh_save_state()
+	_build_level_list()
 
 
 ## Monta um botao por fase registrada. Vem do [LevelRegistry] em vez de
@@ -72,7 +155,7 @@ func _build_level_list() -> void:
 		_level_list.add_child(button)
 		_level_buttons.append(button)
 
-	# Com uma fase só não há o que escolher.
+	# Com uma fase so nao ha o que escolher.
 	_level_list.visible = _level_buttons.size() > 1
 
 
@@ -93,8 +176,8 @@ func _refresh_save_state() -> void:
 func _on_play() -> void:
 	Sfx.play(&"select")
 	GameState.reset()
-	# "Jogar" sempre vai para a primeira fase -- é o botão de início, não um
-	# atalho para a última jogada. Para escolher, use a lista abaixo.
+	# "Jogar" sempre vai para a primeira fase -- e o botao de inicio, nao um
+	# atalho para a ultima jogada. Para escolher, use a lista abaixo.
 	var first := LevelRegistry.default_id()
 	SceneRouter.goto(LevelRegistry.path_for(first), first)
 
@@ -106,10 +189,10 @@ func _on_continue() -> void:
 		return
 
 	# A cena do save pode ter sumido (fase removida, save antigo). O Save ja
-	# cai na fase padrão nesse caso, mas avisamos em vez de fingir que
+	# cai na fase padrao nesse caso, mas avisamos em vez de fingir que
 	# retomou o progresso.
 	if Save.last_scene_missing():
-		_save_hint.text = "Progresso salvo de uma fase que não existe mais"
+		_save_hint.text = "Progresso salvo de uma fase que nao existe mais"
 		_save_hint.add_theme_color_override("font_color", Color(0.949, 0.361, 0.361))
 		_save_hint.visible = true
 

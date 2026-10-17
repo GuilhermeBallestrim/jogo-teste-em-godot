@@ -11,6 +11,15 @@ const SAVE_DIR := "user://saves"
 const SAVE_VERSION := 2
 const DEFAULT_SLOT := &"main"
 
+## Slot ativo. O jogo inteiro (save, load, peek) usa este slot por padrao.
+## O menu troca o slot ativo quando o jogador escolhe outro.
+var active_slot: StringName = DEFAULT_SLOT
+
+func set_active_slot(slot: StringName) -> void:
+	if slot == &"":
+		slot = DEFAULT_SLOT
+	active_slot = slot
+
 ## Preenchido por [method load_game] com o path da cena salvo.
 var _last_scene_path: String = ""
 ## Id da fase carregada, resolvido pelo [LevelRegistry].
@@ -24,7 +33,7 @@ func _ready() -> void:
 		DirAccess.make_dir_recursive_absolute(SAVE_DIR)
 
 
-func save_game(slot: StringName = DEFAULT_SLOT) -> bool:
+func save_game(slot: StringName = active_slot) -> bool:
 	var path := _path_for(slot)
 	var current := get_tree().current_scene
 	var scene_path := current.scene_file_path if current != null else ""
@@ -58,7 +67,7 @@ func save_game(slot: StringName = DEFAULT_SLOT) -> bool:
 	return true
 
 
-func load_game(slot: StringName = DEFAULT_SLOT) -> bool:
+func load_game(slot: StringName = active_slot) -> bool:
 	var path := _path_for(slot)
 	if not FileAccess.file_exists(path):
 		save_failed.emit(slot, "Nenhum save encontrado em '%s'." % path)
@@ -106,7 +115,7 @@ func load_game(slot: StringName = DEFAULT_SLOT) -> bool:
 	return true
 
 
-func has_save(slot: StringName = DEFAULT_SLOT) -> bool:
+func has_save(slot: StringName = active_slot) -> bool:
 	return FileAccess.file_exists(_path_for(slot))
 
 
@@ -144,7 +153,7 @@ func _read_payload(path: String) -> Dictionary:
 ## no botão certo, e não vale a pena carregar o `GameState` inteiro para isso.
 ## Leitura crua do arquivo de propósito: quem conhece o formato é o `Save`,
 ## não a UI.
-func peek_level_id(slot: StringName = DEFAULT_SLOT) -> StringName:
+func peek_level_id(slot: StringName = active_slot) -> StringName:
 	var data := _read_payload(_path_for(slot))
 	if data.is_empty():
 		return &""
@@ -156,7 +165,7 @@ func peek_level_id(slot: StringName = DEFAULT_SLOT) -> StringName:
 	return LevelRegistry.id_for_path(String(data.get("scene_path", "")))
 
 
-func erase_save(slot: StringName = DEFAULT_SLOT) -> bool:
+func erase_save(slot: StringName = active_slot) -> bool:
 	if not has_save(slot):
 		return false
 	if DirAccess.remove_absolute(_path_for(slot)) != OK:
