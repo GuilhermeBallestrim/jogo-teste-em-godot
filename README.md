@@ -67,7 +67,8 @@ novo-jogo/
 ```
 
 Detalhes em [`docs/architecture.md`](docs/architecture.md),
-[`docs/design.md`](docs/design.md) e [`docs/roadmap.md`](docs/roadmap.md).
+[`docs/design.md`](docs/design.md), [`docs/roadmap.md`](docs/roadmap.md) e
+[`docs/plano-evolucao.md`](docs/plano-evolucao.md).
 
 ## Validação
 

@@ -133,6 +133,24 @@ ter 9 poses legíveis sem um único arquivo de imagem — e que a decisão
 
 ---
 
+## Onda seguinte
+
+O detalhamento de cada feature (onde mexer, como verificar, o que cortar se
+parar no meio) está em [`plano-evolucao.md`](plano-evolucao.md). Resumo da
+ordem:
+
+```
+Onda 1  camera → feedback de combate → particulas
+Onda 2  stats → save por slot/hub → mais verbos de combate
+Onda 3  editor de layout → mais inimigos → mais fases
+```
+
+O principleo que organiza: **cada onda faz o jogo parecer mais finished, não
+maior.** Câmera com antecipação vale mais que uma quarta fase, porque afeta
+todas elas.
+
+---
+
 ## Fora do escopo
 
 ### i18n — **descartado**
