@@ -79,6 +79,7 @@ func goto(scene_path: String, scene_id: StringName = &"", fade_time: float = FAD
 
 	# `change_scene_to_file` so instancia a nova cena no fim do frame.
 	await get_tree().process_frame
+	_apply_presentation()
 
 	if fade_time > 0.0:
 		await _tween_alpha(1.0, 0.0, fade_time)
@@ -103,6 +104,21 @@ func reload(fade_time: float = FADE_TIME) -> void:
 
 func quit_to_menu() -> void:
 	get_tree().quit()
+
+
+## Aplica as preferencias visuais a cena recem-carregada.
+##
+## Este e o unico lugar por onde toda cena entra no jogo, entao e o unico lugar
+## que precisa lembrar de contraste e escala de texto. Cada `LevelBase` fazer o
+## proprio `if` seria tres lembretes -- e o menu, que nao e `LevelBase`, seria
+## o quarto.
+func _apply_presentation() -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	Presentation.set_contrast(scene, Settings.high_contrast)
+	if not is_equal_approx(Settings.ui_scale, 1.0):
+		Presentation.apply_ui_scale(scene, Settings.ui_scale)
 
 
 func _fit_fade() -> void:

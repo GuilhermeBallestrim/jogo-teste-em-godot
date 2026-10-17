@@ -19,10 +19,20 @@ func _apply_vertical(delta: float) -> void:
 	super._apply_vertical(delta)
 
 	_hop_timer = maxf(_hop_timer - delta, 0.0)
-	# So pula quando tem para onde ir (andando ou perseguindo).
-	if is_on_floor() and _hop_timer <= 0.0 and absf(velocity.x) > 10.0:
-		velocity.y = hop_power
-		_hop_timer = hop_cooldown
+	# So pula quando tem para onde ir (andando ou perseguindo)...
+	if not (is_on_floor() and _hop_timer <= 0.0 and absf(velocity.x) > 10.0):
+		return
+	# ...e quando ha chao do outro lado. Sem esta linha o slime pula da
+	# beirada e cai no KillZone -- era o bug mais visivel da fase 1.
+	if not has_ground_ahead(signf(velocity.x)):
+		# Preso na beirada: espera um pouco e tenta o outro lado, para nao
+		# ficar parado para sempre de um lado so.
+		_hop_timer = 0.25
+		velocity.x = -signf(velocity.x) * patrol_speed
+		return
+
+	velocity.y = hop_power
+	_hop_timer = hop_cooldown
 
 
 func _on_landed() -> void:

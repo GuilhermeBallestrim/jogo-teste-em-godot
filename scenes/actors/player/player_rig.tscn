@@ -1,0 +1,62 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/actors/player/player_rig.gd" id="1_rig"]
+
+[node name="Rig" type="Node2D"]
+script = ExtResource("1_rig")
+
+[node name="LegBack" type="Polygon2D" parent="."]
+position = Vector2(-4, 12)
+color = Color(0.086, 0.110, 0.180, 1)
+polygon = PackedVector2Array(-3, 0, 3, 0, 2.5, 15, -3.5, 15)
+
+[node name="Scarf" type="Polygon2D" parent="."]
+position = Vector2(-4, -14)
+color = Color(0.929, 0.325, 0.361, 1)
+polygon = PackedVector2Array(0, -4, -10, -3, -15, 1, -10, 4, 0, 4)
+
+[node name="LegFront" type="Polygon2D" parent="."]
+position = Vector2(4, 12)
+color = Color(0.129, 0.165, 0.263, 1)
+polygon = PackedVector2Array(-3, 0, 3, 0, 2.5, 15, -3.5, 15)
+
+[node name="ArmBack" type="Polygon2D" parent="."]
+position = Vector2(-6.5, -12)
+color = Color(0.145, 0.337, 0.612, 1)
+polygon = PackedVector2Array(-2.5, 0, 2.5, 0, 2, 16, -3, 16)
+
+[node name="Torso" type="Polygon2D" parent="."]
+position = Vector2(0, 12)
+color = Color(0.294, 0.62, 0.961, 1)
+polygon = PackedVector2Array(-8, -26, 8, -26, 9, 0, -9, 0)
+
+[node name="Belt" type="Polygon2D" parent="Torso"]
+position = Vector2(0, -4)
+color = Color(0.078, 0.302, 0.588, 1)
+polygon = PackedVector2Array(-9, -2.5, 9, -2.5, 9, 2.5, -9, 2.5)
+
+[node name="Emblem" type="Polygon2D" parent="Torso"]
+position = Vector2(0, -19)
+color = Color(0.976, 0.831, 0.376, 1)
+polygon = PackedVector2Array(0, -3.5, 3, -1, 1.8, 3.5, -1.8, 3.5, -3, -1)
+
+[node name="ArmFront" type="Polygon2D" parent="."]
+position = Vector2(6.5, -12)
+color = Color(0.42, 0.745, 1, 1)
+polygon = PackedVector2Array(-2.5, 0, 2.5, 0, 2, 16, -3, 16)
+
+[node name="Head" type="Polygon2D" parent="."]
+position = Vector2(0, -14)
+color = Color(0.976, 0.835, 0.702, 1)
+polygon = PackedVector2Array(0, -15, 4.5, -13, 7, -8, 4.5, -3, 0, -1, -4.5, -3, -7, -8, -4.5, -13)
+
+[node name="Visor" type="Polygon2D" parent="Head"]
+position = Vector2(1.5, -2.5)
+color = Color(0.055, 0.071, 0.106, 1)
+polygon = PackedVector2Array(-5.5, -3, 6, -3, 6, 2.5, -5.5, 2.5)
+
+[node name="Slash" type="Polygon2D" parent="."]
+visible = false
+position = Vector2(11, -8)
+color = Color(1, 0.925, 0.62, 0.85)
+polygon = PackedVector2Array(4, -26, 30, -14, 34, 0, 30, 14, 4, 26, 12, 0)

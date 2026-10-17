@@ -139,6 +139,81 @@ sem autoloads. Dois motivos, ambos práticos:
 `player.gd` guarda apelidos (`const SPEED := PlayerTuning.SPEED`) para o corpo
 do código continuar legível.
 
+## Bone do player (`PlayerRig`)
+
+O jogador é montado por peça — cabeça, tronco, dois braços, duas pernas e um
+cachecol — e cada peça gira em torno da sua própria articulação:
+
+```
+Player (CharacterBody2D)
+  `-- Rig   (PlayerRig)
+      |-- LegBack / LegFront   pivô no quadril
+      |-- Torso                 pivô no quadril (+ Belt, Emblem)
+      |-- Scarf                 pivô no pescoço
+      |-- ArmBack / ArmFront   pivô no ombro
+      |-- Head / Visor         pivô no pescoço
+      `-- Slash                 só no ataque
+```
+
+Nove estados (IDLE, WALK, RUN, DASH, JUMP, FALL, ATTACK, DAMAGE, DEATH), cada
+um com uma pose alvo. A pose atual **persegue** a alvo com velocidade própria,
+e uma camada procedural entra por cima: respiração, ciclo de passo cuja
+frequência acompanha a velocidade, ondulação do cachecol, tremor do dash.
+
+O `Player` descreve *o que está acontecendo* (`_rig.resolve(...)` recebe o
+contexto) e o rig decide *qual figura ganha*. A anatomia fica em um arquivo só.
+
+O teste `Player: poses do bone` compara a assinatura numérica dos nove
+estados e falha se duas renderizarem a mesma coisa. Uma pose duplicada é
+invisível numa captura pequena e invisível em qualquer teste estrutural — e é
+exatamente o defeito que o bone mais simples tinha.
+
+## Itens (`src/items/`)
+
+`ItemDefinition` é dado puro: id, nome, cor, valor, e um `Effect`. Ela **não**
+referencia `GameState`. Quem tem o estado aplica o efeito — `GameState.use_item`
+passa `self` para `item.apply()`. Um `Resource` que puxa autoload deixa de ser
+dado e quebra o runner de testes, que compila os scripts antes de os autoloads
+existirem como identificador.
+
+`ItemLibrary` monta o catálogo em código. O método de busca chama
+`definition()` e não `get()`: `get` colide com `Object.get()` e não compila.
+
+## Preferências além de áudio (`Settings`)
+
+**Remapeamento.** `Settings` guarda `bindings` (ação → eventos) em
+`settings.cfg` e reescreve o `InputMap`. A serialização é explícita
+(`{"t":"key","c":<código físico>}`) e não `as_text()`: `as_text()` devolve o
+*rótulo* da tecla, que muda com o idioma do sistema.
+
+Duas armadilhas que o código comenta no lugar:
+
+- Só eventos de teclado/mouse são reescritos. Os eixos de gamepad ficam
+  intocados — apagá-los junto é o caminho mais curto para um remapeamento de
+  teclado derrubar o controle inteiro **sem erro nenhum**.
+- `bindings` precisa começar como cópia do padrão. `_apply_bindings()` apaga os
+  eventos remapeáveis antes de reinserir, então uma lista vazia apaga tudo e
+  não devolve nada.
+
+**Escala de texto.** Reescreve `theme_override_font_sizes` e guarda o tamanho
+base em metadado. Não dá para usar `content_scale_factor` (escalaria o mundo
+junto, e o mundo é visto por uma `Camera2D`) nem `Theme.default_font_size` (que
+o projeto ignora, porque cada `Label` do `.tscn` tem o seu override). O
+metadado existe para reaplicar não acumular: 1,5 × 1,5 = 2,25 a cada visita ao
+painel.
+
+## Limites da fase (`LevelBounds`)
+
+Cada fase declara o campo jogável uma vez (`Bounds`), e três coisas saem
+disso: as paredes invisíveis na camada `WORLD`, os limites da câmera e a
+verificação de que o `KillZone` cobre a largura toda. Sem parede embaixo de
+propósito — quem cai tem de chegar no `KillZone`, que cobra a vida e devolve ao
+checkpoint; uma parede ali transformaria toda queda em morte instantânea.
+
+Sem isso, cada fase repetia a mesma informação em lugares que podiam divergir:
+a câmera mostrava o nada, ou existia uma faixa onde o jogador caía e nunca era
+resgatado.
+
 ## Prova de que o level design funciona
 
 `tests/test_runner.gd` fecha um grafo das plataformas de cada fase: uma
@@ -166,3 +241,6 @@ faz a suíte falhar.
 | `Polygon2D` no lugar de sprites | Sem arte no repositório; a troca é substituir o nó `Sprite` e o script lê `$Sprite` |
 | Estado do FSM comparado por **nome** | `Enemy.state_name()` sobrevive a reinserir um estado no enum; um índice literal mediria a coisa errada em silêncio |
 | Objetivo da fase declarado no Inspector | `coins_to_win` + o guard `_check_goal_is_reachable()` avisam se a fase pede mais do que a cena tem |
+| Bone em código, não sprite | Nove poses legíveis sem um arquivo de imagem no repositório. Quando vier arte, substitui o `Rig` e o resto não muda |
+| `src/` sem referência a autoload | Um `Resource` de dado que puxa `GameState` deixa de ser dado e quebra o runner de testes, que compila antes dos autoloads existirem |
+| Serializar tecla por código físico, não `as_text()` | `as_text()` devolve o rótulo, que muda com o idioma do sistema: um save feito em português deixaria de funcionar em inglês |

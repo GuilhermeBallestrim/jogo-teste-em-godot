@@ -33,6 +33,18 @@ const CHASE_ACCELERATION := 1400.0
 const PATROL_PAUSE := 0.6
 const PATROL_TOLERANCE := 8.0
 
+## Quanto o corpo olha para a frente, em px, antes de perguntar "tem chao
+## aqui?". Chega de perto da borda para o inimigo frear em vez de sair
+## colando no vazio.
+const LEDGE_PROBE := 12.0
+## Quao longe o raycast procura chao abaixo do probe.
+const LEDGE_DEPTH := 28.0
+## Rede de seguranca padrao: quantos px o inimigo pode cair antes de voltar
+## para casa. Nunca deveria disparar -- e a guarda de borda que impede a
+## queda. Existe para o caso do knockback e de plataforma que some no meio
+## da fase.
+const DEFAULT_FALL_LIMIT := 280.0
+
 const HITBOX_ACTIVE_TIME := 0.16
 const ATTACK_TIME := 0.22
 const ATTACK_RECOVER := 0.45
@@ -53,8 +65,28 @@ const AIM_TIME := 0.45
 @export var patrol_speed := 90.0
 @export var chase_speed := 215.0
 @export var attack_lunge := 180.0
-@export var patrol_left := -120.0
-@export var patrol_right := 120.0
+## Deslocamento horizontal da patrulha em relacao ao ponto onde o inimigo
+## foi colocado na cena. **Nao e coordenada de mundo**: escrever
+## `patrol_right = 150` numa fase que comeca em x = -1000 significa "para a
+## direita ate -850", nao "va para x = 150". Era assim mesmo no codigo, e
+## era o motivo de todo slime sair andando para o fim do mapa.
+@export var patrol_left := -120.0:
+	set(value):
+		patrol_left = value
+		_patrol_bounds_dirty = true
+@export var patrol_right := 120.0:
+	set(value):
+		patrol_right = value
+		_patrol_bounds_dirty = true
+
+## Quanto o inimigo e autorizado a se afastar da casa. 0 = sem limite.
+## Serve para o arqueiro na torre: ele não deve descer seis plataformas
+## atrás do jogador.
+@export var leash_radius := 0.0
+## Quantos px o inimigo pode cair antes de ser devolvido a casa. A guarda de
+## borda já impede a queda de propósito; isto cobre o resto (knockback,
+## plataforma removida). 0 desliga.
+@export var fall_limit := 0.0
 
 @export_group("Combate")
 @export var max_health := 3
@@ -74,6 +106,10 @@ var _attack_cooldown := 0.0
 var _hitbox_timer := 0.0
 var _facing := 1.0
 var _patrol_target_x := 0.0
+## Onde o inimigo nasceu. Ancora da patrulha, do limite e da rede de
+## seguranca. Ver [member patrol_left].
+var _home := Vector2.ZERO
+var _patrol_bounds_dirty := true
 
 @onready var _sprite: Polygon2D = $Sprite
 @onready var _shape: CollisionShape2D = $CollisionShape2D
@@ -90,9 +126,41 @@ func _ready() -> void:
 	collision_mask = Layers.WORLD | Layers.PLAYER
 
 	health = max_health
-	_patrol_target_x = patrol_right
+	# Ancorado no instante da entrada: `_ready` roda quando o inimigo ja
+	# esta na posicao que a cena definiu, entao este e o ponto de partida.
+	_home = global_position
+	if not flies and fall_limit <= 0.0:
+		fall_limit = DEFAULT_FALL_LIMIT
 	_hitbox.damage = contact_damage
 	_apply_appearance()
+	_patrol_target_x = patrol_right_x()
+
+
+## Extremo esquerdo da patrulha, em coordenada de mundo.
+func patrol_left_x() -> float:
+	return _home.x + patrol_left
+
+
+## Extremo direito da patrulha, em coordenada de mundo.
+func patrol_right_x() -> float:
+	return _home.x + patrol_right
+
+
+## Onde este inimigo foi colocado na cena. Ancora da patrulha, do limite e da
+## rede de seguranca.
+func home_position() -> Vector2:
+	return _home
+
+
+func home_x() -> float:
+	return _home.x
+
+
+func _refresh_patrol_target() -> void:
+	# O Inspector pode mudar os offsets em runtime; o alvo precisa acompanhar.
+	if _patrol_bounds_dirty:
+		_patrol_target_x = patrol_right_x()
+		_patrol_bounds_dirty = false
 
 
 func _apply_appearance() -> void:
@@ -124,14 +192,63 @@ func _physics_process(delta: float) -> void:
 		_find_target()
 
 	_think(delta)
+	_refresh_patrol_target()
+	_guard_ledge(delta)
 	_apply_vertical(delta)
 	move_and_slide()
 	_track_landing()
+	_guard_offscreen()
 
 	if absf(velocity.x) > 5.0:
 		_facing = signf(velocity.x)
 		_sprite.scale.x = _facing
 		_hitbox.position.x = absf(_hitbox.position.x) * _facing
+
+
+## Ninguem cai no vazio por querer.
+##
+## Um inimigo andando chega na borda da plataforma e continua andando: sem
+## isto, todo slime acabava no KillZone e o arquiro descia da torre. O
+## comportamento certo na beirada e parar -- e o jogador ver o inimigo
+## esperando, que e a leitura de "ele nao vai me pegar daqui".
+##
+## A parada e dura, e nao uma frenagem: a beirada e o pior lugar para
+## hesitar, e um inimigo deslizando pela borda parece bug.
+func _guard_ledge(_delta: float) -> void:
+	if flies or not is_on_floor():
+		return
+	if absf(velocity.x) < 1.0:
+		return
+	if has_ground_ahead(signf(velocity.x)):
+		return
+	velocity.x = 0.0
+
+
+## Ha chao na direcao `direction`, logo abaixo da borda do corpo?
+##
+## Publico porque quem se locomove pulando precisa da mesma resposta: o
+## slime so salta se ha para onde cair.
+func has_ground_ahead(direction: float) -> bool:
+	var probe := body_size.x * 0.5 + LEDGE_PROBE
+	var from := global_position + Vector2(direction * probe, body_size.y * 0.4)
+	var query := PhysicsRayQueryParameters2D.create(
+		from, from + Vector2(0.0, LEDGE_DEPTH), Layers.WORLD
+	)
+	query.exclude = [get_rid()]
+	return get_world_2d().direct_space_state.intersect_ray(query).is_empty() == false
+
+
+## Ultima linha de defesa. Se o inimigo mesmo assim cair -- knockback forte,
+## plataforma que o designer removeu, bug em outra parte -- ele volta para
+## casa em vez de morrer em silencio e sumir do jogo.
+func _guard_offscreen() -> void:
+	if flies or fall_limit <= 0.0:
+		return
+	if global_position.y <= _home.y + fall_limit:
+		return
+	global_position = _home
+	velocity = Vector2.ZERO
+	_set_state(State.IDLE)
 
 
 func _track_landing() -> void:
@@ -231,7 +348,7 @@ func _patrol(delta: float) -> void:
 		velocity.x, signf(_patrol_target_x - global_position.x) * patrol_speed, 700.0 * delta
 	)
 	if absf(global_position.x - _patrol_target_x) < PATROL_TOLERANCE:
-		_patrol_target_x = patrol_left if _patrol_target_x == patrol_right else patrol_right
+		_patrol_target_x = patrol_left_x() if _patrol_target_x == patrol_right_x() else patrol_right_x()
 		_set_state(State.IDLE)
 	elif _sees_target(detect_range):
 		_set_state(State.CHASE)
@@ -248,6 +365,10 @@ func _chase(delta: float) -> void:
 
 	if absf(to_target) <= attack_range and _attack_cooldown <= 0.0:
 		_set_state(State.AIM)
+	elif leash_radius > 0.0 and global_position.distance_to(_home) > leash_radius:
+		# Esticou a corda demais: volta para casa em vez de atravessar a
+		# fase inteira atrás de um jogador que fugiu.
+		_set_state(State.PATROL)
 
 
 ## Dispara um [Projectile]. Subclasses que atiram sobrescrevem isto; o

@@ -52,7 +52,7 @@ var _invuln_timer := 0.0
 var _was_on_floor := true
 var _dead := false
 
-@onready var _sprite: Polygon2D = $Sprite
+@onready var _rig: PlayerRig = $Rig
 @onready var _hurtbox: Hurtbox = $Hurtbox
 @onready var _hitbox: Hitbox = $Hitbox
 @onready var _spark: CPUParticles2D = $Hitbox/Spark
@@ -116,21 +116,40 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	_update_rig(delta)
 	if _invuln_timer <= 0.0:
 		return
 	_invuln_timer -= delta
 	# Piscada para indicar invulnerabilidade.
-	_sprite.modulate.a = 0.3 if int(_invuln_timer * 22.0) % 2 == 0 else 1.0
+	_rig.modulate.a = 0.3 if int(_invuln_timer * 22.0) % 2 == 0 else 1.0
 	if _invuln_timer <= 0.0:
 		_hurtbox.invulnerable = false
-		_sprite.modulate = Color.WHITE
+		_rig.modulate = Color.WHITE
+
+
+## Traduz o estado do corpo na pose do bone.
+##
+## Quem decide a ordem de prioridade e o [PlayerRig], nao aqui: o player
+## descreve *o que esta acontecendo*, e o rig escolhe a figura. Assim a
+## anatomia (qual pose ganha sobre qual) fica em um arquivo só.
+func _update_rig(delta: float) -> void:
+	_rig.play(_rig.resolve(
+		_dead,
+		_invuln_timer > IFRAME_TIME * 0.55,
+		is_dashing(),
+		_attack_timer > 0.0,
+		is_on_floor(),
+		velocity.y,
+		velocity.x
+	))
+	_rig.tick(delta)
 
 
 # ------------------------------------------------------------------ dash
 
 
 func _start_dash(input_dir: Vector2) -> void:
-	_dash_direction = input_dir if input_dir != Vector2.ZERO else Vector2(signf(_sprite.scale.x), 0.0)
+	_dash_direction = input_dir if input_dir != Vector2.ZERO else Vector2(signf(_rig.facing), 0.0)
 	_dash_timer = DASH_TIME
 	velocity = _dash_direction * DASH_SPEED
 	Sfx.play(&"dash", -6.0)
@@ -197,6 +216,40 @@ func _unhandled_input(event: InputEvent) -> void:
 		velocity.y *= JUMP_CUT
 	elif event.is_action_pressed(&"attack"):
 		_try_attack()
+	elif event.is_action_pressed(&"interact"):
+		try_use_item()
+
+
+## Consome o primeiro item com efeito. `interact` estava no Input Map sem
+## ninguem consumindo -- era a acao sobrando do prototipo, e usar item e
+## exatamente o que ela sempre esteve ali para fazer.
+## Publico para o teste: e o mesmo caminho que a tecla `interact` chama.
+func try_use_item() -> void:
+	if _dead:
+		return
+	var id := GameState.first_usable_id()
+	if id == &"":
+		Sfx.play(&"back", -8.0)
+		return
+	if GameState.use_item(id, self):
+		return  # o som sai de `on_item_used`
+	# Vida cheia: `use_item` recusa e devolve false sem gastar. O som de "não
+	# dá" importa mais que o de "deu": sem ele o jogador acha que usou.
+	Sfx.play(&"back", -6.0)
+
+
+## Cura direta, para quem quiser um pickup que não passa pelo inventário.
+func heal(amount: int) -> void:
+	if _dead or amount <= 0:
+		return
+	GameState.heal(amount)
+	Sfx.play(&"coin", -2.0, 1.3)
+
+
+## Gancho que o [ItemDefinition] chama depois de aplicar o efeito. Existe para
+## o som: o item sabe o que faz, e o Player sabe como soar.
+func on_item_used(_item: Resource) -> void:
+	Sfx.play(&"coin", -2.0, 1.3)
 
 
 ## Aceleração da gravidade **por segundo**, aplicada ao passo atual.
@@ -236,11 +289,11 @@ func _tick_timers(delta: float) -> void:
 
 func _update_facing(input_dir: Vector2) -> void:
 	if input_dir.x != 0.0:
-		_sprite.scale.x = signf(input_dir.x)
+		_rig.facing = signf(input_dir.x)
 	elif absf(velocity.x) > 1.0:
-		_sprite.scale.x = signf(velocity.x)
+		_rig.facing = signf(velocity.x)
 	# A hitbox fica sempre a frente do corpo.
-	_hitbox.position.x = ATTACK_REACH * signf(_sprite.scale.x)
+	_hitbox.position.x = ATTACK_REACH * signf(_rig.facing)
 
 
 # --------------------------------------------------------------- combate
@@ -279,7 +332,7 @@ func _die() -> void:
 	_dead = true
 	_hurtbox.invulnerable = true
 	_hitbox.deactivate()
-	_sprite.modulate = Color(0.55, 0.55, 0.62, 0.8)
+	_rig.modulate = Color(0.55, 0.55, 0.62, 0.8)
 	velocity = Vector2(velocity.x * 0.3, JUMP_VELOCITY * 0.55)
 	Sfx.play(&"death")
 	died.emit()

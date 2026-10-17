@@ -19,72 +19,171 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Panel" type="PanelContainer" parent="Center"]
-custom_minimum_size = Vector2(460, 0)
+custom_minimum_size = Vector2(520, 0)
 layout_mode = 2
 
 [node name="Margin" type="MarginContainer" parent="Center/Panel"]
 layout_mode = 2
 theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 24
+theme_override_constants/margin_top = 22
 theme_override_constants/margin_right = 28
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_bottom = 22
 
 [node name="Column" type="VBoxContainer" parent="Center/Panel/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 14
 
 [node name="Title" type="Label" parent="Center/Panel/Margin/Column"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 26
 text = "Opcoes"
 horizontal_alignment = 1
 
-[node name="MusicRow" type="HBoxContainer" parent="Center/Panel/Margin/Column"]
+[node name="Tabs" type="TabContainer" parent="Center/Panel/Margin/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 330)
+layout_mode = 2
+size_flags_vertical = 3
+current_tab = 0
+tab_alignment = 1
+
+[node name="Geral" type="VBoxContainer" parent="Center/Panel/Margin/Column/Tabs"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="MusicRow" type="HBoxContainer" parent="Center/Panel/Margin/Column/Tabs/Geral"]
 layout_mode = 2
 theme_override_constants/separation = 14
 
-[node name="Label" type="Label" parent="Center/Panel/Margin/Column/MusicRow"]
-custom_minimum_size = Vector2(96, 0)
+[node name="Label" type="Label" parent="Center/Panel/Margin/Column/Tabs/Geral/MusicRow"]
+custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 text = "Musica"
 
-[node name="MusicSlider" type="HSlider" parent="Center/Panel/Margin/Column/MusicRow"]
+[node name="MusicSlider" type="HSlider" parent="Center/Panel/Margin/Column/Tabs/Geral/MusicRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 0)
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 4
 value = 70.0
 
-[node name="SfxRow" type="HBoxContainer" parent="Center/Panel/Margin/Column"]
+[node name="SfxRow" type="HBoxContainer" parent="Center/Panel/Margin/Column/Tabs/Geral"]
 layout_mode = 2
 theme_override_constants/separation = 14
 
-[node name="Label" type="Label" parent="Center/Panel/Margin/Column/SfxRow"]
-custom_minimum_size = Vector2(96, 0)
+[node name="Label" type="Label" parent="Center/Panel/Margin/Column/Tabs/Geral/SfxRow"]
+custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 text = "Efeitos"
 
-[node name="SfxSlider" type="HSlider" parent="Center/Panel/Margin/Column/SfxRow"]
+[node name="SfxSlider" type="HSlider" parent="Center/Panel/Margin/Column/Tabs/Geral/SfxRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 0)
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 4
 value = 90.0
 
-[node name="FullscreenCheck" type="CheckButton" parent="Center/Panel/Margin/Column"]
+[node name="FullscreenCheck" type="CheckButton" parent="Center/Panel/Margin/Column/Tabs/Geral"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Tela cheia"
 
-[node name="Spacer" type="Control" parent="Center/Panel/Margin/Column"]
-custom_minimum_size = Vector2(0, 8)
+[node name="Acessibilidade" type="VBoxContainer" parent="Center/Panel/Margin/Column/Tabs"]
 layout_mode = 2
-mouse_filter = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="UiScaleRow" type="VBoxContainer" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="UiScaleHeader" type="HBoxContainer" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade/UiScaleRow"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Label" type="Label" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade/UiScaleRow/UiScaleHeader"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Tamanho do texto"
+
+[node name="UiScaleValue" type="Label" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade/UiScaleRow/UiScaleHeader"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "100%"
+horizontal_alignment = 2
+
+[node name="UiScaleSlider" type="HSlider" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade/UiScaleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+value = 100.0
+
+[node name="ShakeRow" type="HBoxContainer" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Tremor de camera"
+
+[node name="ShakeSlider" type="HSlider" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+value = 100.0
+
+[node name="ShakeValue" type="Label" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "100%"
+
+[node name="ContrastCheck" type="CheckButton" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Alto contraste (clareia a cena)"
+
+[node name="Note" type="Label" parent="Center/Panel/Margin/Column/Tabs/Acessibilidade"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.6, 0.66, 0.74, 1)
+text = "O alto contraste clareia tudo, inclusive o cenario escuro. Ajuda a enxergar o personagem em fundo escuro."
+autowrap_mode = 3
+
+[node name="Controles" type="VBoxContainer" parent="Center/Panel/Margin/Column/Tabs"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BindingsBox" type="VBoxContainer" parent="Center/Panel/Margin/Column/Tabs/Controles"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="CaptureHint" type="Label" parent="Center/Panel/Margin/Column/Tabs/Controles"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.976, 0.831, 0.376, 1)
+text = ""
+
+[node name="ResetBindingsButton" type="Button" parent="Center/Panel/Margin/Column/Tabs/Controles"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+text = "Restaurar controles padrao"
 
 [node name="CloseButton" type="Button" parent="Center/Panel/Margin/Column"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 text = "Voltar"
+
+[connection signal="pressed" from="Center/Panel/Margin/Column/Tabs/Controles/ResetBindingsButton" to="." method="_on_reset_bindings_pressed"]

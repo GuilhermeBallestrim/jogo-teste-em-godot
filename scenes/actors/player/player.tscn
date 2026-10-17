@@ -1,6 +1,7 @@
-[gd_scene load_steps=8 format=3 uid="uid://d3k5b5kg1fca5"]
+[gd_scene load_steps=9 format=3 uid="uid://d3k5b5kg1fca5"]
 
 [ext_resource type="Script" uid="uid://c1n7fxtny075t" path="res://scenes/actors/player/player.gd" id="1_player"]
+[ext_resource type="PackedScene" path="res://scenes/actors/player/player_rig.tscn" id="9_rig"]
 [ext_resource type="Script" uid="uid://2xrdedeeyjn5" path="res://src/combat/hurtbox.gd" id="2_hurtbox"]
 [ext_resource type="Script" uid="uid://briv8c3ehth6u" path="res://src/combat/hitbox.gd" id="3_hitbox"]
 [ext_resource type="Script" uid="uid://deho6ip88faqg" path="res://src/camera/camera_shake.gd" id="4_shake"]
@@ -20,14 +21,7 @@ z_index = 10
 floor_snap_length = 8.0
 script = ExtResource("1_player")
 
-[node name="Sprite" type="Polygon2D" parent="."]
-color = Color(0.29, 0.62, 0.96, 1)
-polygon = PackedVector2Array(-16, -28, 16, -28, 16, 28, -16, 28)
-
-[node name="Visor" type="Polygon2D" parent="Sprite"]
-position = Vector2(6, -14)
-color = Color(0.06, 0.07, 0.11, 1)
-polygon = PackedVector2Array(-5, -5, 5, -5, 5, 5, -5, 5)
+[node name="Rig" parent="." instance=ExtResource("9_rig")]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CapsuleShape2D_body")

@@ -29,7 +29,7 @@ Cena principal: `scenes/ui/main_menu.tscn`. Para pular direto para uma fase:
 | Pular | `Espaço` ou `W` | — |
 | Dash | `Shift` | — |
 | Atacar | botão esquerdo do mouse | — |
-| Interagir | `E` | — |
+| Usar item | `E` | — |
 | Pausar | `Esc` | — |
 | Reiniciar a fase | `R` | — |
 
@@ -48,17 +48,20 @@ novo-jogo/
 │   ├── camera/          # camera_shake.gd
 │   ├── combat/          # Hitbox, Hurtbox
 │   ├── core/            # Layers
+│   ├── items/           # ItemDefinition, ItemLibrary (catalogo)
 │   ├── level/           # LevelBase (fluxo da fase), LevelRegistry (id <-> cena)
-│   └── player/          # PlayerTuning (numeros de movimento + balistica)
+│   ├── player/          # PlayerTuning (numeros de movimento + balistica)
+│   └── ui/              # Presentation (escala de texto, contraste)
 ├── scenes/
 │   ├── actors/
-│   │   ├── player/      # player.gd + player.tscn
+│   │   ├── player/      # player.gd + player.tscn, player_rig (bone de 9 poses)
 │   │   └── enemies/     # enemy.gd (FSM), slime, bat, archer
 │   ├── levels/          # level_01, level_02
-│   ├── props/           # platform, coin, checkpoint, kill_zone, projectile
+│   ├── props/           # platform, coin, item_pickup, checkpoint,
+│   │                    # kill_zone, projectile, level_bounds
 │   └── ui/              # main_menu, hud, pause_menu, options_panel, end_screen
 ├── tests/               # test_runner.gd + enemy_arena.gd
-├── tools/               # dump_inputmap.gd (diagnostico)
+├── tools/               # dump_inputmap.gd, capture_rig.gd, capture_ui.gd
 ├── docs/                # architecture.md, design.md, roadmap.md
 └── .github/workflows/   # ci.yml
 ```
@@ -77,8 +80,9 @@ Ou direto:
 ```powershell
 $godot = "C:\Users\Guilherme\Desktop\Godot_v4.5.1.exe"
 
-# 218 verificacoes: Layers, InputMap, GameState, Save, audio, fisica do player,
-# FSM dos tres inimigos, balistica das duas fases e as 14 cenas
+# 335 verificacoes: Layers, InputMap, GameState, Save, inventario, audio,
+# fisica do player, bone (9 poses distintas), FSM dos tres inimigos, guarda de
+# borda, remapeamento, acessibilidade, balistica das fases e as cenas
 & $godot --headless --path . --script res://tests/test_runner.gd
 
 # rodar o jogo 5 segundos sem erros nem avisos
@@ -87,6 +91,23 @@ $godot = "C:\Users\Guilherme\Desktop\Godot_v4.5.1.exe"
 # ver como o Input Map foi interpretado
 & $godot --headless --path . --script res://tools/dump_inputmap.gd
 ```
+
+### Captura de tela
+
+Duas ferramentas que rodam **sem** `--headless` (o renderizador headless é um
+dummio e a imagem sai vazia) e salvam PNG em `user://capturas`:
+
+```powershell
+# as 9 poses do bone do player, lado a lado
+& $godot --path . --resolution 1500x900 --script res://tools/capture_rig.gd
+
+# menu, as 3 abas de opcoes, a fase, e a fase com texto grande / alto contraste
+& $godot --path . --resolution 1280x720 --script res://tools/capture_ui.gd
+```
+
+As duas contam cores distintas na imagem salva. Um PNG em branco "salva" sem
+erro nenhum, e é a checagem que separa "funcionou" de "funcionou e tem
+conteúdo".
 
 Todos saem com código 0 quando está tudo certo — é o que o CI usa.
 
@@ -117,7 +138,10 @@ Todos saem com código 0 quando está tudo certo — é o que o CI usa.
   sobrescreve `_apply_vertical()` / `_on_landed()` / `_fire()`. Nenhum `if
   enemy_type == ...` no meio da FSM.
 - **Números compartilhados** — constantes que mais de um arquivo precisa ficam
-  em `src/`, não duplicadas.
+  em `src/`, não duplicadas. `src/` nunca referencia autoload: um `Resource`
+  de dado que puxa `GameState` deixa de ser dado e quebra o runner de testes.
+- **Ver o que se fez** — problema de layout, de contraste ou de pose não se
+  resolve lendo o código. `tools/capture_*.gd` tira a foto.
 - **GDScript** — nunca combine tipo explícito com `:=` (`var x: int := 5` é
   erro de parse; use `=` com tipo declarado ou `:=` sem tipo).
 - **Nomes** — `snake_case` em arquivos e variáveis, `PascalCase` em classes e

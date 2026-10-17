@@ -32,6 +32,7 @@ signal finished(victory: bool)
 @onready var _player: Player = $Player
 @onready var _hud: HUD = $HUD
 @onready var _camera: Camera2D = $Player/Camera2D
+@onready var _bounds: LevelBounds = get_node_or_null(^"Bounds")
 
 var is_finished := false
 var _pause_menu: PauseMenu = null
@@ -44,6 +45,7 @@ func _ready() -> void:
 	_apply_camera_limits()
 	_hud.set_coin_goal(coins_to_win)
 	_check_goal_is_reachable()
+	_check_kill_zone_covers_bounds()
 	_player.died.connect(_on_player_died)
 	Music.play()
 
@@ -95,10 +97,41 @@ func _check_goal_is_reachable() -> void:
 func _apply_camera_limits() -> void:
 	if _camera == null:
 		return
-	_camera.limit_left = int(camera_limits.position.x)
-	_camera.limit_top = int(camera_limits.position.y)
-	_camera.limit_right = int(camera_limits.end.x)
-	_camera.limit_bottom = int(camera_limits.end.y)
+	# O [LevelBounds] é a fonte da verdade quando a fase declara um. O
+	# `camera_limits` do Inspector continua valendo como reserva para uma fase
+	# que ainda não foi migrada.
+	var box := _bounds.rect() if _bounds != null else camera_limits
+	_camera.limit_left = int(box.position.x)
+	_camera.limit_top = int(box.position.y)
+	_camera.limit_right = int(box.end.x)
+	_camera.limit_bottom = int(box.end.y)
+
+
+## O buraco mortífero tem de cobrir a largura toda, senão existe uma faixa onde
+## o jogador cai e nunca é resgatado. Cai na tela em vez de sumir.
+func _check_kill_zone_covers_bounds() -> void:
+	if _bounds == null:
+		return
+	var kill_zone := get_node_or_null(^"KillZone") as Node2D
+	if kill_zone == null:
+		push_warning("[%s] nao tem KillZone: quem cai passa do limite." % name)
+		return
+
+	var left: float = kill_zone.global_position.x - _kill_zone_half_width(kill_zone)
+	var right: float = kill_zone.global_position.x + _kill_zone_half_width(kill_zone)
+	if left > _bounds.left_x or right < _bounds.right_x:
+		push_warning(
+			"[%s] KillZone cobre %.0f..%.0f mas a fase vai de %.0f..%.0f: "
+			% [name, left, right, _bounds.left_x, _bounds.right_x]
+			+ "o jogador pode cair fora da zona e ficar preso."
+		)
+
+
+func _kill_zone_half_width(kill_zone: Node2D) -> float:
+	var shape := kill_zone.get_node_or_null(^"CollisionShape2D") as CollisionShape2D
+	if shape != null and shape.shape is RectangleShape2D:
+		return (shape.shape as RectangleShape2D).size.x * 0.5
+	return 0.0
 
 
 # ------------------------------------------------------------------ fluxo

@@ -33,6 +33,7 @@ const LEVELS := [
 ]
 
 const MENU_SCENE := "res://scenes/ui/main_menu.tscn"
+const RIG_SCENE := "res://scenes/actors/player/player_rig.tscn"
 
 var _passed := 0
 var _failed := 0
@@ -48,6 +49,10 @@ var _empty_suites := PackedStringArray()
 ## quando o script e compilado, entao resolvemos pela arvore.
 var _gs: Node = null
 var _save: Node = null
+## Preferencias globais. Os testes mexem nelas (remapeamento, contraste) e
+## `_report()` as restaura: um `settings.cfg` sujo contamina a proxima
+## execucao.
+var _settings: Node = null
 
 
 func _process(_delta: float) -> bool:
@@ -71,6 +76,18 @@ func _process(_delta: float) -> bool:
 
 
 func _report() -> void:
+	# As preferencias de teclado, audio e contraste persistem em
+	# `user://settings.cfg`. Os testes mexem nelas de proposito, e um
+	# `settings.cfg` deixado para tras faria a proxima execucao comecar com a
+	# tecla de pulo trocada -- e o teste de InputMap reprovaria sem ninguem ter
+	# mexido em nada. Voltar ao padrao faz parte do teste, nao e limpeza extra.
+	if _settings != null:
+		_settings.reset_bindings()
+		_settings.set_ui_scale(1.0)
+		_settings.set_shake_scale(1.0)
+		_settings.set_high_contrast(false)
+		_settings.save_settings()
+
 	print("")
 	# Rede de seguranca: uma suite que quebra em tempo de execucao (metodo
 	# inexistente, tipo errado) aborta antes de registrar qualquer checagem, e
@@ -86,6 +103,7 @@ func _report() -> void:
 
 	if _failed == 0:
 		print("  %d verificacoes OK" % _passed)
+
 		print("TESTES: PASSARAM")
 		return
 
@@ -112,6 +130,7 @@ func _begin(suite: String) -> void:
 
 
 func _check(condition: bool, message: String) -> void:
+
 	if condition:
 		_passed += 1
 	else:
@@ -132,9 +151,11 @@ func _check_eq(actual: Variant, expected: Variant, message: String) -> void:
 func _run_unit_tests() -> void:
 	_gs = root.get_node_or_null(^"GameState")
 	_save = root.get_node_or_null(^"Save")
+	_settings = root.get_node_or_null(^"Settings")
 
 	_check(_gs != null, "autoload GameState ausente")
 	_check(_save != null, "autoload Save ausente")
+	_check(_settings != null, "autoload Settings ausente")
 	if _gs == null or _save == null:
 		_unit_done = true
 		return
@@ -148,14 +169,119 @@ func _run_unit_tests() -> void:
 	_test_music()
 	await _test_player_physics()
 	await _test_enemy_fsm()
+	_test_inventory()
+	await _test_use_item_action()
+	await _test_key_remap()
+	await _test_accessibility()
 	_test_level_reachability()
+	await _test_levels_keep_enemies()
 	await _test_menu_lists_every_level()
+	await _test_player_rig_poses()
 	_unit_done = true
 
 
 ## O menu tem de oferecer exatamente uma entrada por fase registrada: nem
 ## menos (uma fase que ninguem consegue escolher) nem mais (um botao que abre
 ## um id inexistente).
+## O bone do player precisa de 8 estados que deem silhuetas diferentes.
+##
+## Nao basta existir a pose: se duas renderizam a mesma coisa, o jogador nao
+## tem leitura de "ele esta caindo" vs "ele esta pulando", e o defeito e
+## invisivel numa captura pequena e invisivel nos testes estruturais.
+func _test_player_rig_poses() -> void:
+	_begin("Player: poses do bone")
+
+	var rig_scene := load(RIG_SCENE) as PackedScene
+	_check(rig_scene != null, "player_rig.tscn carregou")
+	if rig_scene == null:
+		return
+
+	var rig := rig_scene.instantiate() as PlayerRig
+	root.add_child(rig)
+	await process_frame
+
+	_check(rig != null, "rig instancia com a classe certa")
+	if rig == null:
+		return
+
+	# Uma "assinatura" por estado: angulos e posicoes de todas as pecas, com
+	# duas casas. Dois estados com a mesma assinatura sao o mesmo desenho.
+	var signatures := {}
+	var states := [
+		PlayerRig.State.IDLE, PlayerRig.State.WALK, PlayerRig.State.RUN,
+		PlayerRig.State.DASH, PlayerRig.State.JUMP, PlayerRig.State.FALL,
+		PlayerRig.State.ATTACK, PlayerRig.State.DAMAGE, PlayerRig.State.DEATH,
+	]
+	for state: PlayerRig.State in states:
+		rig.facing = 1.0
+		rig.play(state)
+		for _i in 40:
+			rig.tick(1.0 / 60.0)
+		signatures[state] = _pose_signature(rig)
+
+	_check(
+		signatures.size() == states.size(),
+		"os %d estados produziram assinatura" % states.size()
+	)
+
+	var duplicates := PackedStringArray()
+	var names := PackedStringArray()
+	for state: PlayerRig.State in states:
+		names.append(rig.State.keys()[state])
+		for other: PlayerRig.State in states:
+			if other <= state:
+				continue
+			if signatures[state] == signatures[other]:
+				duplicates.append("%s==%s" % [names[state], names[other]])
+	_check(
+		duplicates.is_empty(),
+		"nenhuma pose duplicada%s" % ("" if duplicates.is_empty() else ": " + ", ".join(duplicates))
+	)
+
+	# O arco do golpe é exclusive dele: aparecendo em outra pose vira um
+	# borrão amarelo permanente na tela.
+	for state: PlayerRig.State in states:
+		rig.facing = 1.0
+		rig.play(PlayerRig.State.IDLE)
+		for _i in 20:
+			rig.tick(1.0 / 60.0)
+		rig.play(state)
+		rig.tick(1.0 / 60.0)
+		var should_show: bool = state == PlayerRig.State.ATTACK
+		_check(
+			rig.slash_visible() == should_show,
+			"arco %s em %s" % ["presente" if should_show else "ausente", names[state]]
+		)
+
+	# Espelhar e o que faz o bone virar na direcao do movimento.
+	rig.facing = -1.0
+	rig.play(PlayerRig.State.IDLE)
+	rig.tick(1.0 / 60.0)
+	_check(rig.scale.x < 0.0, "facing -1 espelha o bone")
+
+	rig.queue_free()
+	await process_frame
+
+
+## Assinatura numérica da pose atual, com 2 casas.
+func _pose_signature(rig: Node2D) -> String:
+	var parts := ["leg_back", "scarf", "leg_front", "arm_back", "torso", "arm_front", "head"]
+	var out := PackedStringArray()
+	for part: String in parts:
+		var node := rig.get_node_or_null(NodePath(String(part).to_pascal_case())) as Node2D
+		if node == null:
+			out.append(part + ":?")
+			continue
+		out.append("%s:%.2f,%.2f,%.2f,%.2f" % [
+			part,
+			snappedf(node.rotation, 0.01),
+			node.position.x,
+			node.position.y,
+			node.scale.y,
+		])
+	return "|".join(out)
+
+
 func _test_menu_lists_every_level() -> void:
 	_begin("Menu: lista de fases")
 
@@ -662,6 +788,7 @@ func _test_player_physics() -> void:
 
 func _test_enemy_fsm() -> void:
 	await _test_enemy_patrol()
+	await _test_enemy_ledge_guard()
 	await _test_enemy_detects_player()
 	await _test_enemy_line_of_sight()
 	await _test_enemy_attack_and_damage()
@@ -761,6 +888,11 @@ func _test_ranged_enemy() -> void:
 
 
 ## Sem player na cena, o slime fica entre PATROL e IDLE e nunca persegue.
+##
+## A afirmacao e sobre a EXTENSAO percorrida, nao sobre a posicao no fim dos
+## 300 quadros. Medir a posicao final de um oscilador e teste fragil: passa
+## ou falha conforme o instante exato em que a amostra cai, e nao porque o
+## comportamento mudou.
 func _test_enemy_patrol() -> void:
 	_begin("Enemy: patrulha sem alvo")
 	var arena := EnemyArena.new()
@@ -774,11 +906,31 @@ func _test_enemy_patrol() -> void:
 	await arena.settle(30)
 	_check(arena.enemy.is_on_floor(), "slime assentou no chao")
 
-	var start_x: float = arena.enemy.global_position.x
+	# `patrol_left`/`patrol_right` sao deslocamentos a partir de casa, e nao
+	# coordenadas de mundo. Com o inimigo em x=0 a distincao nao aparece; com
+	# ele deslocado, apareceria -- e era o que fazia o slime atravessar a
+	# fase inteira atrás de um alvo em x=150.
+	var home: float = arena.enemy.home_x()
+	var left_x: float = arena.enemy.patrol_left_x()
+	var right_x: float = arena.enemy.patrol_right_x()
+	_check(
+		is_equal_approx(left_x, home - 200.0) and is_equal_approx(right_x, home + 200.0),
+		"patrulha e relativa a casa (casa=%.0f, faixa %.0f..%.0f)" % [home, left_x, right_x]
+	)
+
 	var seen := {}
-	for _i in 300:
+	var lowest: float = arena.enemy.global_position.x
+	var highest: float = lowest
+	# 700 quadros (~11,6s): uma ida e volta completa entre -200 e +200 leva
+	# ~7,2s a 90 px/s, mais a pausa de 0,6s em cada ponta. Com menos quadros a
+	# amostra so pegaria a ida -- e o teste mediria a velocidade, nao o
+	# comportamento.
+	for _i in 700:
 		await physics_frame
 		seen[arena.enemy.state_name()] = true
+		var x: float = arena.enemy.global_position.x
+		lowest = minf(lowest, x)
+		highest = maxf(highest, x)
 
 	_check(
 		not seen.has(&"CHASE"),
@@ -788,9 +940,69 @@ func _test_enemy_patrol() -> void:
 		seen.has(&"PATROL") or seen.has(&"IDLE"),
 		"ficou no ciclo IDLE/PATROL (estados: %s)" % str(seen.keys())
 	)
+	_check(
+		highest - lowest > 300.0,
+		"percorreu a faixa inteira (%.0f px, de %.0f a %.0f)"
+			% [highest - lowest, lowest, highest]
+	)
+	_check(
+		lowest >= left_x - 40.0 and highest <= right_x + 40.0,
+		"nao saiu da faixa de patrulha (%.0f..%.0f, limite %.0f..%.0f)"
+			% [lowest, highest, left_x, right_x]
+	)
 
-	var moved: float = absf(arena.enemy.global_position.x - start_x)
-	_check(moved > 20.0, "andei durante a patrulha (%.1f px)" % moved)
+	arena.dispose()
+
+
+## O inimigo nao pode cair no vazio. E o teste que cobre a promessa feita ao
+## jogador de que a beirada e segura.
+func _test_enemy_ledge_guard() -> void:
+	_begin("Enemy: guarda de borda")
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build_ledge(240.0)
+	# Patrulha maior que a plataforma: ele nao tem para onde ir, e isso e o teste.
+	arena.enemy.patrol_left = -400.0
+	arena.enemy.patrol_right = 400.0
+	arena.enemy.global_position = Vector2(0, -20)
+
+	await arena.settle(30)
+	_check(arena.enemy.is_on_floor(), "slime assentou na plataforma estreita")
+
+	# O probe precisa concordar com a borda: no meio acha chao dos dois lados.
+	_check(arena.enemy.has_ground_ahead(1.0), "acha chao no meio da plataforma")
+	_check(arena.enemy.has_ground_ahead(-1.0), "acha chao no meio (esquerda)")
+
+	var floor_y: float = arena.enemy.global_position.y
+	var deepest := 0.0
+	for _i in 600:
+		await physics_frame
+		deepest = maxf(deepest, arena.enemy.global_position.y - floor_y)
+
+	# Tolerancia de 60px: o pulo do slime (~46px) mais a penetracao no chao.
+	# Acima disso ele saiu da plataforma.
+	_check(
+		deepest < 60.0,
+		"nao caiu da plataforma (afundou %.0f px em 10 segundos)" % deepest
+	)
+	_check(
+		absf(arena.enemy.global_position.x) < 140.0,
+		"nao andou alem da ponta (x=%.0f)" % arena.enemy.global_position.x
+	)
+
+	# E a rede final: se cair mesmo assim, volta para casa em vez de sumir.
+	arena.enemy.global_position.y += 900.0
+	for _i in 6:
+		await physics_frame
+	_check(
+		arena.enemy.is_on_floor(),
+		"voltou para a plataforma depois de cair no vazio (y=%.0f)"
+			% arena.enemy.global_position.y
+	)
+	_check(
+		arena.enemy.global_position.distance_to(arena.enemy.home_position()) < 40.0,
+		"e voltou para perto de casa, nao para um lugar aleatorio"
+	)
 
 	arena.dispose()
 
@@ -959,6 +1171,398 @@ func _test_enemy_death() -> void:
 ## E um grafo, nao uma comparacao par a par: na fase 1 as plataformas
 ## flutuantes ficam altas demais para sair do chao, mas o caminho existe
 ## passando por elas. So o grafo sabe disso.
+## A fase real, rodada por 15 segundos, com a IA de verdade.
+##
+## E o teste que cobre a promessa que o jogador faz a cada fase: "ali tem
+## um inimigo". Sem ele, um slime que cai no vazio some e a fase fica
+## trivial sem ninguem perceber -- foi exatamente assim que os inimigos
+## atravessavam o mapa.
+func _test_levels_keep_enemies() -> void:
+	for level_path: String in LEVELS:
+		var name := level_path.get_file().get_basename()
+		_begin("Fase: inimigos nao caem (%s)" % name)
+
+		var packed := load(level_path) as PackedScene
+		if packed == null:
+			_check(false, "%s carregou" % name)
+			continue
+
+		var level := packed.instantiate()
+		root.add_child(level)
+		await process_frame
+
+		var kill_zone := level.get_node_or_null(^"KillZone") as Node2D
+		var kill_y: float = kill_zone.global_position.y if kill_zone != null else 110.0
+
+		var initial: Array[Node2D] = _enemies_of(level)
+		_check(initial.size() > 0, "%s tem %d inimigos" % [name, initial.size()])
+		# Congela o nome agora, enquanto todo inimigo ainda esta vivo. Vai num
+		# dicionario do runner, e nao em metadado do node: um inimigo morto no
+		# ultimo quadro e `queue_free()`-ado, e um node liberado transformaria
+		# o proprio `get_meta` numa falha.
+		var names_at_start := {}
+		for enemy: Node2D in initial:
+			names_at_start[enemy] = enemy.name
+
+		# O player vai para o alto da fase, fora do alcance de qualquer inimigo.
+		#
+		# Deixá-lo no SpawnPoint parece inofensivo e não é: o slime mais próximo
+		# está a 80 px, dentro do `detect_range`, persegue e mata o player. Aí
+		# o teste deixa de medir "os inimigos ficam na fase" e passa a medir
+		# "quantos o player matou" — e a falha aparece como "inimigo perdido",
+		# que é um diagnóstico que aponta para o lugar errado.
+		var player := level.get_node_or_null(^"Player") as Node2D
+		if player != null:
+			player.global_position = Vector2(0.0, -2000.0)
+
+		for _i in 900:
+			await physics_frame
+
+		var alive := 0
+		var present := {}
+		for enemy: Node2D in _enemies_of(level):
+			if not is_instance_valid(enemy):
+				continue
+			alive += 1
+			present[enemy.name] = true
+			var y: float = enemy.global_position.y
+			_check(
+				y < kill_y,
+				"%s: %s esta acima do KillZone (y=%.0f, zona em %.0f)"
+					% [name, enemy.name, y, kill_y]
+			)
+
+		# O nome vem do dicionario congelado acima: ler `enemy.name` agora
+		# estoura em um node ja liberado.
+		var lost := PackedStringArray()
+		for enemy: Node2D in initial:
+			var enemy_name := String(names_at_start.get(enemy, "&"))
+			if not is_instance_valid(enemy) or not present.has(enemy_name):
+				lost.append(enemy_name)
+		_check(
+			lost.is_empty(),
+			"%s: nenhum inimigo sumiu (%d de %d)%s"
+				% [
+					name,
+					alive,
+					initial.size(),
+					"" if lost.is_empty() else " -- perdidos: " + ", ".join(lost),
+				]
+		)
+
+		level.free()
+		await process_frame
+
+
+func _enemies_of(level: Node) -> Array[Node2D]:
+	var out: Array[Node2D] = []
+	for node in level.get_tree().get_nodes_in_group(&"enemies"):
+		var enemy := node as Node2D
+		if enemy != null and level.is_ancestor_of(enemy):
+			out.append(enemy)
+	return out
+
+
+## O inventario tem que sobreviver ao save e recusar o que nao faz sentido.
+## O caso que mais importa e o ultimo: item desconhecido no save e bug de
+## conteudo, e inventar um item desconhecido esconderia esse bug.
+func _test_inventory() -> void:
+	_begin("GameState: inventario")
+
+	_gs.reset()
+	_check(ItemLibrary.all_ids().size() >= 2, "catalogo tem itens")
+	_check(ItemLibrary.has(&"potion"), "pocao existe no catalogo")
+	_check(ItemLibrary.definition(&"potion").has_use(), "pocao tem efeito")
+	_check(not ItemLibrary.has(&"nao_existe"), "item inexistente nao existe")
+	_check(ItemLibrary.definition(&"nao_existe") == null, "item inexistente devolve null")
+
+	# Coletar
+	_check_eq(_gs.add_item(&"potion", 2), 2, "add_item devolve o aceito")
+	_check_eq(_gs.item_count(&"potion"), 2, "contagem correta")
+	_check(_gs.has_item(&"potion", 2), "has_item com quantidade")
+	_check(not _gs.has_item(&"potion", 3), "has_item sem quantidade suficiente")
+
+	# Recusas: cada uma tem de devolver 0 e nao mexer em nada.
+	_check_eq(_gs.add_item(&"nao_existe", 1), 0, "id desconhecido devolve 0")
+	_check_eq(_gs.add_item(&"potion", 0), 0, "quantidade zero devolve 0")
+	_check_eq(_gs.add_item(&"potion", -3), 0, "quantidade negativa devolve 0")
+	_check_eq(_gs.item_count(&"potion"), 2, "recusas nao alteraram nada")
+
+	# Sinal
+	var seen := []
+	var on_item := func(id: StringName, count: int) -> void: seen.append([id, count])
+	_gs.item_changed.connect(on_item)
+	_gs.add_item(&"feather", 1)
+	_gs.item_changed.disconnect(on_item)
+	_check_eq(seen.size(), 1, "item_changed disparou uma vez")
+	_check(
+		seen.size() == 1 and seen[0][0] == &"feather" and seen[0][1] == 1,
+		"item_changed trouxe id e contagem nova"
+	)
+
+	# Usar: com vida cheia, o item e recusado e NAO e consumido.
+	_gs.reset()
+	_gs.add_item(&"potion", 1)
+	_check(_gs.health == _gs.max_health, "vida cheia no inicio")
+	_check(not _gs.use_item(&"potion"), "pocao recusada com vida cheia")
+	_check_eq(_gs.item_count(&"potion"), 1, "recusa nao gastou o item")
+
+	# Agora com vida ferida: usa, cura e consome.
+	_gs.take_damage(60)
+	_check(_gs.use_item(&"potion"), "pocao usada com vida ferida")
+	_check(_gs.health > _gs.max_health - 60, "vida subiu (%d)" % _gs.health)
+	_check_eq(_gs.item_count(&"potion"), 0, "item consumido")
+
+	# Item sem efeito nao e usavel, mas continua no inventario.
+	_gs.add_item(&"feather", 1)
+	_check(not _gs.use_item(&"feather"), "pena nao tem efeito, nao e usavel")
+	_check_eq(_gs.item_count(&"feather"), 1, "pena continua guardada")
+	_check(not _gs.use_item(&"nao_existe"), "usar id inexistente falha")
+
+	# Save: ida e volta preserva, e item órfão é descartado.
+	_gs.reset()
+	_gs.add_item(&"potion", 3)
+	_gs.add_item(&"coin_pouch", 1)
+	var snapshot: Dictionary = _gs.to_dict()
+	_check(snapshot.has("items"), "to_dict inclui items")
+
+	_gs.reset()
+	_check_eq(_gs.item_count(&"potion"), 0, "reset limpou o inventario")
+	_gs.from_dict(snapshot)
+	_check_eq(_gs.item_count(&"potion"), 3, "pocoes voltaram do save")
+	_check_eq(_gs.item_count(&"coin_pouch"), 1, "bolsa voltou do save")
+
+	# Save de uma versao futura / conteudo removido.
+	_gs.from_dict({"items": {"potion": 1, "item_retirado_do_jogo": 5}})
+	_check_eq(_gs.item_count(&"potion"), 1, "item conhecido sobrevive")
+	_check_eq(_gs.item_count(&"item_retirado_do_jogo"), 0, "item orfao foi descartado")
+
+	_gs.reset()
+
+
+## `interact` e a acao de usar item. Ela ja estava no Input Map sem ninguem
+## consumindo; o teste garante que continua mapeada e que e usavel.
+func _test_use_item_action() -> void:
+	_begin("Player: usar item")
+
+	_check(InputMap.has_action(&"interact"), "interact existe no Input Map")
+
+	_gs.reset()
+	_gs.take_damage(50)
+	_gs.add_item(&"potion", 1)
+	var health_before: int = _gs.health
+
+	var arena := EnemyArena.new()
+	root.add_child(arena)
+	arena.build(true)
+	await arena.settle(10)
+
+	# Input sintetico nao reproduz teclado real neste ambiente (ja sabemos de
+	# antes), entao chamamos o caminho que o input dispara.
+	arena.player.try_use_item()
+	await process_frame
+
+	_check(_gs.item_count(&"potion") == 0, "E consumiu a pocao")
+	_check(_gs.health > health_before, "E curou (%d -> %d)" % [health_before, _gs.health])
+
+	# Sem item, nada acontece e o jogador nao perde nada.
+	var health_full: int = _gs.health
+	_gs.take_damage(20)
+	var health_hurt: int = _gs.health
+	arena.player.try_use_item()
+	await process_frame
+	_check(_gs.health == health_hurt, "sem item, nao curou")
+	_check(_gs.health != health_full, "mas o dano continua valendo")
+
+	arena.dispose()
+	_gs.reset()
+
+
+## Remapeamento: a parte que quebra o jogo e silenciosa. Perder a tecla de
+## pular ou apagar o gamepad junto nao da erro nenhum -- o jogo so fica
+## "estranho". Por isso os testes olham o InputMap depois de mexer.
+func _test_key_remap() -> void:
+	_begin("Settings: remapeamento")
+
+	var settings := root.get_node_or_null(^"Settings")
+	_check(settings != null, "autoload Settings ausente")
+	if settings == null:
+		return
+
+	for action: StringName in Settings.REMAPPABLE:
+		_check(InputMap.has_action(action), "acao %s existe" % action)
+
+	# Padrao: toda acao tem alguma tecla.
+	for action: StringName in Settings.REMAPPABLE:
+		_check(
+			settings.binding_text(action) != "--",
+			"%s tem binding padrao (%s)" % [action, settings.binding_text(action)]
+		)
+
+	var jump_before: String = String(settings.binding_text(&"jump"))
+
+	# Troca para uma tecla和改进: uma tecla quase sem uso.
+	var nova := InputEventKey.new()
+	nova.physical_keycode = KEY_K
+	_check(settings.set_binding(&"jump", nova), "set_binding aceitou a tecla")
+
+	# A troca tem de chegar no InputMap, e nao so no dicionario: e o InputMap
+	# que o jogo le.
+	var achou := false
+	for event in InputMap.action_get_events(&"jump"):
+		if event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_K:
+			achou = true
+	_check(achou, "InputMap tem a nova tecla de jump")
+	_check(settings.binding_text(&"jump") != jump_before, "texto do binding mudou")
+	_check(settings.binding_text(&"jump") == "K", "texto mostra K (=%s)" % settings.binding_text(&"jump"))
+
+	# Gamepad sobrevive ao remapeamento de teclado.
+	var tem_joypad := false
+	for event in InputMap.action_get_events(&"move_left"):
+		if event is InputEventJoypadMotion:
+			tem_joypad = true
+	_check(tem_joypad, "o analógico do gamepad continua em move_left")
+
+	# Persistencia: grava, recarrega e confere.
+	settings.save_settings()
+	settings.set_binding(&"jump", InputEventKey.new())
+	settings.load_settings()
+	var voltou := false
+	for event in InputMap.action_get_events(&"jump"):
+		if event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_K:
+			voltou = true
+	_check(voltou, "o remapeamento sobreviveu a save/load")
+
+	# Restaurar padrao volta ao que o jogo realmente usa.
+	settings.reset_bindings()
+	_check(
+		settings.binding_text(&"jump") == jump_before,
+		"restaurar devolveu o padrao (%s -> %s)" % [jump_before, settings.binding_text(&"jump")]
+	)
+
+	# Recusas. `Settings.quiet_rejections` silencia o `push_error` nestes
+	# casos: recusar e o comportamento esperado, e o aviso viraria erro no
+	# log do export.
+	settings.set(&"quiet_rejections", true)
+	_check(not settings.set_binding(&"nao_existe", nova), "acao inexistente recusada")
+	_check(not settings.set_binding(&"jump", InputEventJoypadMotion.new()), "joystick recusado")
+	settings.set(&"quiet_rejections", false)
+
+	# Conflito: duas acoes com a mesma tecla e erro do jogador, nao do jogo.
+	var salto := InputEventKey.new()
+	salto.physical_keycode = KEY_SPACE
+	settings.set_binding(&"interact", salto)
+	# `jump` já usa Espaço por padrão, então o conflito existe mas pode ser
+	# reportado em qualquer uma das duas — o que não pode é não ser reportado.
+	var conflito: StringName = settings.conflict_with(salto)
+	_check(
+		conflito == &"jump" or conflito == &"interact",
+		"conflito detectado (=%s)" % conflito
+	)
+	settings.reset_bindings()
+
+	settings.save_settings()
+
+
+## Acessibilidade: as tres preferencias chegam onde prometem.
+func _test_accessibility() -> void:
+	_begin("Settings: acessibilidade")
+
+	var settings := root.get_node_or_null(^"Settings")
+	_check(settings != null, "autoload Settings ausente")
+	if settings == null:
+		return
+
+	# Escala de texto: tem de aumentar o fonte E ser reversivel.
+	#
+	# Testado num `Label` de verdade vindo da HUD, e nao num `Label.new()`: um
+	# no criado em codigo tem o override posto aqui mesmo, e passaria mesmo com
+	# a escala quebrada. A diferenca entre "funciona" e "funciona na interface
+	# que o jogador le" e o que este teste existe para nao perder.
+	# Nao instanciamos a HUD aqui. Em modo `--script` os autoloads ainda nao
+	# sao identificadores quando o runner compila, e `hud.gd` referencia
+	# `GameState` -> `Compile Error` e o runner inteiro se recusa a carregar.
+	# Alem disso a propria HUD imprime "Parameter p_child is null" ao ser
+	# adicionada fora de uma fase.
+	#
+	# O que importa e que um `Label` com override de fonte reescale. O
+	# `Label` do `player.tscn` nao serve (nao e um `Label`), entao construimos
+	# um igual ao que a HUD usa: override explicito, e nao herdado do tema.
+	var label := Label.new()
+	label.add_theme_font_size_override(&"font_size", 20)
+	root.add_child(label)
+
+	var base: int = label.get_theme_font_size(&"font_size")
+	_check(base == 20, "o rotulo comeca em 20 (=%d)" % base)
+	var esperado := int(round(base * 1.5))
+
+	settings.set_ui_scale(1.5)
+	Presentation.apply_ui_scale(root, 1.5)
+	await process_frame
+	var maior: int = label.get_theme_font_size(&"font_size")
+	_check(maior == esperado, "fonte %d x 1,5 = %d (=%d)" % [base, esperado, maior])
+
+	# Reaplicar nao pode multiplicar de novo: 1,5 x 1,5 seria 22 em cima de 15.
+	Presentation.apply_ui_scale(root, 1.5)
+	await process_frame
+	_check(
+		label.get_theme_font_size(&"font_size") == maior,
+		"escala nao acumula (=%d)" % label.get_theme_font_size(&"font_size")
+	)
+
+	Presentation.reset_ui_scale(root)
+	await process_frame
+	_check(label.get_theme_font_size(&"font_size") == base, "reset volta a %d" % base)
+
+	# Um rotulo SEM override precisa ganhar um: a escala alcança todo texto da
+	# interface, nao so o que ja vinha com tamanho proprio.
+	var sem_override := Label.new()
+	root.add_child(sem_override)
+	Presentation.apply_ui_scale(root, 1.5)
+	await process_frame
+	_check(
+		sem_override.get_theme_font_size(&"font_size") > 0,
+		"rotulo sem override tambem recebe tamanho"
+	)
+	sem_override.queue_free()
+
+	settings.set_ui_scale(1.0)
+	label.queue_free()
+
+	# Limites: a preferencia nao aceita valor absurdo vindo de config editada.
+	settings.set_ui_scale(99.0)
+	_check(is_equal_approx(settings.ui_scale, Settings.UI_SCALE_MAX), "escala tem teto")
+	settings.set_ui_scale(0.01)
+	_check(is_equal_approx(settings.ui_scale, Settings.UI_SCALE_MIN), "escala tem piso")
+	settings.set_ui_scale(1.0)
+
+	# Contraste.
+	var scene := Node2D.new()
+	root.add_child(scene)
+	Presentation.set_contrast(scene, true)
+	_check(Presentation.has_contrast(scene), "contraste adicionou o CanvasModulate")
+	var modulate := scene.get_node(^"Contrast") as CanvasModulate
+	_check(modulate != null and modulate.color == Presentation.CONTRAST_ON, "contraste ligado")
+	Presentation.set_contrast(scene, false)
+	_check(modulate.color == Presentation.CONTRAST_OFF, "contraste desligado")
+	scene.queue_free()
+
+	# Tremor: com a preferencia em zero, `shake_for` nao pode nem ligar.
+	var shake := load("res://src/camera/camera_shake.gd").new() as CameraShake
+	root.add_child(shake)
+	await process_frame
+	settings.set_shake_scale(0.0)
+	shake.shake_for(1.0)
+	_check(not shake.is_shaking(), "preferencia 0 impede o tremor")
+	settings.set_shake_scale(1.0)
+	shake.shake_for(1.0)
+	_check(shake.is_shaking(), "preferencia 1 liga o tremor")
+	shake.stop()
+	shake.queue_free()
+
+	settings.save_settings()
+
+
 func _test_level_reachability() -> void:
 	_begin("Fases: layout atravessavel")
 

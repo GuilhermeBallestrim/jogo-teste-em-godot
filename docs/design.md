@@ -28,6 +28,42 @@ O que o protótipo procura, em ordem de prioridade:
 4. **A morte tem que ser barata.** Cair custa 25 de vida e te devolve no
    último checkpoint — sem tela de morte no meio do jogo.
 
+## O bone do player
+
+Sem sprite, o jogador é um bone de peças articuladas. As nove poses e o que
+cada uma comunica:
+
+| Pose | Silhueta | O que diz |
+|---|---|---|
+| IDLE | parado, respirando | seguro |
+| WALK | pernas alternando devagar | deslocamento |
+| RUN | tronco inclinado, passada maior | pressa |
+| DASH | muito inclinado, pernas para trás, cachecol esticado | "não posso desviar" |
+| JUMP | pernas recolhidas, braços para cima | subindo |
+| FALL | pernas abertas, braços abertos | procurando apoio |
+| ATTACK | tronco em torção, braço estendido + arco | golpe |
+| DAMAGE | tronco recuado, braços na frente | levou dano |
+| DEATH | tombando de lado | acabou |
+
+Duas poses que se confundem são o pior defeito possível aqui: o jogador
+perde a informação que mais importa na hora (está caindo ou está pulando?). Por
+isso o teste compara a assinatura numérica das nove e falha se duas forem
+iguais.
+
+## Itens
+
+| Item | Efeito | Onde |
+|---|---|---|
+| Poção | +30 de vida, +50 de pontos | fases 1 e 2 |
+| Bolsa de moedas | +100 de pontos | fases 1 e 2 |
+| Pena | nenhuma (relíquia por enquanto) | fase 1 |
+
+`E` usa o primeiro item com efeito. **Vida cheia recusa e não gasta** — o
+sinal sonoro de "não dá" importa mais que o de "deu", porque sem ele o jogador
+acha que usou.
+
+---
+
 ## Números
 
 Todos em `src/player/player_tuning.gd` (movimento do player),
@@ -94,6 +130,30 @@ Três inimigos, três leituras distintas — sem nenhum deles precisar de sprite
 | **aviso** | o avanço | a subida | os 0,45s parado encarando |
 | **o que ensina** | timing | linha de visão | distância |
 
+### Nenhum inimigo cai do mapa
+
+Isto nao e um detalhe de implementacao, e regra de level design: **inimigo
+precisa ser uma ameaca, nao um acidente.**
+
+Tres mecanismos, porque cada um cobre um buraco diferente:
+
+- **Patrulha relativa a casa.** `patrol_left`/`patrol_right` sao deslocamentos a
+  partir do ponto onde o inimigo foi colocado. Tratados como coordenada de
+  mundo, um slime em `x = -1000` com `patrol_right = 150` ia andar 1150 px at
+  um alvo invisivel no meio do mapa -- e cair no caminho.
+- **Guarda de borda.** Um raycast a frente pergunta "tem chao aqui?". Chegando
+  na beirada, o inimigo **para**. O comportamento certo na borda e o jogador
+  ver o inimigo esperando, que e a leitura de "ele nao vai me pegar daqui".
+- **Rede de seguranca.** Se cair mesmo assim (knockback, plataforma removida),
+  volta para casa em vez de morrer em silencio e sumir do jogo.
+
+O teste `Fase: inimigos nao caem` roda as duas fases por 15 segundos com a IA
+de verdade e falha se qualquer inimigo sumir ou passar do `KillZone`. Ele
+posiciona o player longe de proposito: com o player no `SpawnPoint` o slime mais
+proximo o mata, e o teste passa a medir "quantos o player matou" em vez de
+"os inimigos ficam na fase" -- com uma mensagem de falha apontando para o lugar
+errado.
+
 A telegrafia do `AIM` vale para os dois: o slime agora também congela 0,45s
 antes de atacar. Deu para o ciclo de todo mundo ficar legível pelo mesmo
 gesto.
@@ -102,12 +162,13 @@ gesto.
 
 Lista honesta do que o protótipo **não** tem:
 
-- Nenhum sprite — tudo é `Polygon2D` com cor chapada
-- Nenhuma animação de personagem (o squash do slime é o único tween de feedback)
+- Nenhum sprite importado — o player é um bone de `Polygon2D`, o resto são
+  formas com cor chapada
+- Nenhuma animação por frames; o movimento é procedural e procedural
 - Sem chefe
-- Sem inventário/itens de consumo — `Coin.value` existe, mas nada é gastável
-- Sem menu de remapeamento de teclas (as ações do Input Map já estão prontas
-  para isso; falta a UI)
-- Sem tela de opções de acessibilidade (tamanho de fonte, contraste)
+- Sem item com efeito de combate (a poção cura, mas não há poção de dano,
+  escudo nem velocidade)
 - Sem áudio gravado — tudo é síntese procedural
 - Sem save por slot; há um slot só, e o menu não trava fases por progresso
+- Sem i18n — **descartado de propósito**. Todo texto está hardcoded em
+  português. É uma dívida conhecida, não um acidente.
