@@ -17,6 +17,12 @@ func _ready() -> void:
 	collision_layer = 0
 	collision_mask = Layers.HITBOX
 	monitorable = false
+	# Indicador visual: a hurtbox e invisivel por padrao.
+	var visual := ColorRect.new()
+	visual.color = Color(0.3, 0.6, 1.0, 0.2)
+	visual.size = Vector2(32, 32)
+	visual.position = Vector2(-16, -16)
+	add_child(visual)
 	area_entered.connect(_on_area_entered)
 
 

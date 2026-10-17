@@ -108,6 +108,7 @@ const AIM_TIME := 0.45
 
 var state: State = State.IDLE
 var health: int = 3
+var _invuln_timer := 0.0
 
 var _target: Node2D = null
 var _state_timer := 0.0
@@ -209,6 +210,10 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_state_timer += delta
+	if _invuln_timer > 0.0:
+		_invuln_timer -= delta
+		if _invuln_timer <= 0.0:
+			_hurtbox.invulnerable = false
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
 	_tick_hitbox(delta)
 
@@ -459,6 +464,8 @@ func apply_damage(amount: int, source: Node, direction: Vector2, knockback: floa
 		return
 
 	health -= amount
+	_invuln_timer = STAGGER_TIME
+	_hurtbox.invulnerable = true
 
 	# Hitstop e numero de dano valem para os dois lados da briga: o golpe que
 	# o player leva e o golpe que ele da precisam pesar igual, senao o jogo

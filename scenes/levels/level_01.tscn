@@ -50,9 +50,10 @@ bottom_y = 140.0
 
 [node name="Platforms" type="Node2D" parent="."]
 
-[node name="Ground1" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(-1000, 40)
-size = Vector2(400, 80)
+[node name="Ground" parent="Platforms" instance=ExtResource("2_platform")]
+position = Vector2(0, 40)
+size = Vector2(3200, 80)
+
 
 [node name="Float1" parent="Platforms" instance=ExtResource("2_platform")]
 position = Vector2(-630, -208)
@@ -60,19 +61,11 @@ size = Vector2(180, 24)
 body_color = Color(0.23921, 0.29803, 0.38431, 1)
 top_color = Color(0.976, 0.776, 0.251, 1)
 
-[node name="Ground2" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(-330, 40)
-size = Vector2(300, 80)
-
 [node name="Float2" parent="Platforms" instance=ExtResource("2_platform")]
 position = Vector2(-70, -248)
 size = Vector2(180, 24)
 body_color = Color(0.23921, 0.29803, 0.38431, 1)
 top_color = Color(0.976, 0.776, 0.251, 1)
-
-[node name="Ground3" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(280, 40)
-size = Vector2(400, 80)
 
 [node name="Float3" parent="Platforms" instance=ExtResource("2_platform")]
 position = Vector2(630, -228)
@@ -80,19 +73,11 @@ size = Vector2(180, 24)
 body_color = Color(0.23921, 0.29803, 0.38431, 1)
 top_color = Color(0.976, 0.776, 0.251, 1)
 
-[node name="Ground4" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(980, 40)
-size = Vector2(400, 80)
-
 [node name="Float4" parent="Platforms" instance=ExtResource("2_platform")]
 position = Vector2(1340, -268)
 size = Vector2(200, 24)
 body_color = Color(0.23921, 0.29803, 0.38431, 1)
 top_color = Color(0.976, 0.776, 0.251, 1)
-
-[node name="Ground5" parent="Platforms" instance=ExtResource("2_platform")]
-position = Vector2(1650, 40)
-size = Vector2(300, 80)
 
 [node name="KillZone" type="Area2D" parent="."]
 position = Vector2(300, 110)
@@ -136,14 +121,8 @@ position = Vector2(980, -40)
 [node name="Coin9" parent="Coins" instance=ExtResource("4_coin")]
 position = Vector2(1340, -320)
 
-[node name="Coin10" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(1650, -40)
-
 [node name="Coin11" parent="Coins" instance=ExtResource("4_coin")]
 position = Vector2(1230, -180)
-
-[node name="Coin12" parent="Coins" instance=ExtResource("4_coin")]
-position = Vector2(1750, -40)
 
 [node name="Items" type="Node2D" parent="."]
 

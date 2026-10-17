@@ -34,6 +34,7 @@ func _ready() -> void:
 
 	_quit.visible = not OS.has_feature("web")
 	_refresh_save_state()
+	GameState.load_progress()
 	_build_slot_list()
 	_build_level_list()
 	_version.text = "Godot %s" % Engine.get_version_info()["string"]

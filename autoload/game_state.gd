@@ -37,9 +37,40 @@ func reset() -> void:
 	score = 0
 	_flags.clear()
 	_items.clear()
+
+
+	_notify_all()
+
+
+## Limpa o progresso (habilidades, niveis completados). Usado em "novo jogo".
+func reset_progress() -> void:
 	_abilities.clear()
 	_completed_levels.clear()
-	_notify_all()
+
+
+## Carrega o progresso do Save ativo, sem tocar no estado de sessao.
+func load_progress() -> void:
+	var slot := Save.active_slot
+	if not Save.has_save(slot):
+		return
+	var data := Save._read_payload(Save._path_for(slot))
+	if data.is_empty():
+		return
+	var saved_abilities: Variant = data.get("abilities", [])
+	if saved_abilities is Array:
+		_abilities = []
+		for a in saved_abilities:
+			var aid := StringName(String(a))
+			if AbilityLibrary.has(aid) and not _abilities.has(aid):
+				_abilities.append(aid)
+	var saved_levels: Variant = data.get("completed_levels", [])
+	if saved_levels is Array:
+		_completed_levels = []
+		for lv in saved_levels:
+			var lid := StringName(String(lv))
+			if not _completed_levels.has(lid):
+				_completed_levels.append(lid)
+
 
 
 func take_damage(amount: int) -> void:

@@ -19,6 +19,12 @@ signal hit(hurtbox: Area2D)
 
 
 func _ready() -> void:
+	# Indicador visual: a hitbox e invisivel por padrao.
+	var visual := ColorRect.new()
+	visual.color = Color(1.0, 0.3, 0.3, 0.25)
+	visual.size = Vector2(40, 24)
+	visual.position = Vector2(-20, -12)
+	add_child(visual)
 	# A camada HITBOX e o que torna a hitbox visivel para as hurtboxes, que
 	# monitoram esta camada. Com `layer = 0` ela nunca era detectada e NENHUM
 	# golpe conectava -- nem do player, nem dos inimigos.
