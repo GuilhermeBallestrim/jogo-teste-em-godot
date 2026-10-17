@@ -487,7 +487,8 @@ func apply_damage(amount: int, source: Node, direction: Vector2, knockback: floa
 		_parry_timer = 0.0
 		Hitstop.trigger(3)
 		_camera_shake.shake_for(0.6)
-		FloatingNumber.spawn(get_tree().current_scene, global_position, 0, Color(0.6, 1.0, 0.9))
+		# Sem numero: o parry e um evento, nao um dano. O tremor e o
+		# hitstop ja dizem que algo aconteceu.
 		if source != null and source.has_method("apply_damage"):
 			source.call("apply_damage", 0, self, -Vector2.ONE, 0.0)
 		return
