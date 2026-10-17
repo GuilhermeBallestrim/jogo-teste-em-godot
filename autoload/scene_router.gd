@@ -20,6 +20,7 @@ var _fade: ColorRect
 func _ready() -> void:
 	layer = TRANSITION_LAYER
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_register_levels()
 
 	_fade = ColorRect.new()
 	_fade.name = "Fade"
@@ -29,6 +30,16 @@ func _ready() -> void:
 	_fade.visible = false
 	add_child(_fade)
 	_fit_fade()
+
+
+## Declara as fases para o [LevelRegistry], que o `Save` usa para transformar
+## o `scene_id` salvo de volta num caminho.
+##
+## Adicionar uma fase e uma linha aqui. A ordem importa: a primeira e a que
+## o menu usa quando o save aponta para uma cena que sumiu.
+func _register_levels() -> void:
+	LevelRegistry.register(&"main_menu", "res://scenes/ui/main_menu.tscn")
+	LevelRegistry.register(&"level_01", "res://scenes/levels/level_01.tscn")
 
 
 func _notification(what: int) -> void:
@@ -81,7 +92,12 @@ func reload(fade_time: float = FADE_TIME) -> void:
 	if current == null:
 		push_warning("SceneRouter: nao ha cena ativa para recarregar.")
 		return
-	await goto(current.scene_file_path, current_scene_id, fade_time)
+	# `current_scene_id` pode estar vazio se a cena foi aberta direto (F5 na
+	# fase). Resolvemos pelo path para o goto nao perder o id.
+	var id := current_scene_id
+	if id == &"":
+		id = LevelRegistry.id_for_path(current.scene_file_path)
+	await goto(current.scene_file_path, id, fade_time)
 
 
 func quit_to_menu() -> void:

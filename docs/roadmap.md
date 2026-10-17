@@ -27,20 +27,27 @@ Enquanto isso não existir, qualquer inimigo novo entra sem rede.
 - Ataque: verificar que a hitbox liga e que o dano chega ao player
 - Morte: verificar `health <= 0` → `State.DEAD`, som pontua
 
-### 0.2 Extrair o fluxo de fase
+### 0.2 Extrair o fluxo de fase — **feito**
 
-`level_01.gd` e `main_menu.gd` compartilham a mesma orquestração (reiniciar,
-ir ao menu, vitória/derrota). Com duas fases isso vira duplicação.
+`src/level/level_base.gd` (`LevelBase`) centraliza reset, pausa, vitória,
+derrota, reinício e o banner de save. `level_01.gd` caiu para 8 linhas: só
+o doc e o `LEVEL_ID`. O layout continua no `.tscn`.
 
-Criar `src/level/level_base.gd` com: reset, pausa, vitória, derrota, banner
-de save. As fases passam a declarar só `coins_to_win` e `camera_limits`.
+Ponto de extensão para fases especiais: `check_extra_victory()` e
+`notify()`.
 
-### 0.3 Corrigir o que a etapa 2 vai expor
+### 0.3 Save com mais de uma fase — **feito**
 
-- `Save` grava `scene_path`, mas `load_game` não restaura **qual** fase é a
-  atual quando há duas — precisa de um mapa de ids para cenas
-- `GameState.reset()` é chamado no `_ready` da fase: ao voltar do menu o
-  progresso é perdido por design. Definir a regra antes de ter 2 fases
+- `src/level/level_registry.gd` (`LevelRegistry`) mapeia id estável ↔ caminho.
+  O `Save` grava `scene_id`, que sobrevive a renomear o arquivo
+- Fase declarada em um lugar só: `_register_levels()` no `SceneRouter`
+- Save apontando para cena removida cai na fase padrão e expõe
+  `last_scene_missing()`, que o menu usa para avisar em vez de fingir
+- `reset_state_on_enter` no `LevelBase` define se a fase limpa o
+  `GameState` — a fase 2 continua de onde a 1 parou
+- `SAVE_VERSION` 1 → 2, com leitura da versão 1 legada (só tinha `scene_path`)
+- `SceneRouter.reload()` resolve o id pelo path quando a cena foi aberta
+  direto (F5), onde `current_scene_id` está vazio
 
 ---
 

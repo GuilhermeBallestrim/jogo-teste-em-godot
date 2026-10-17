@@ -130,6 +130,7 @@ func _run_unit_tests() -> void:
 	_test_layers()
 	_test_input_map()
 	_test_game_state()
+	_test_level_registry()
 	_test_save()
 	_test_sfx()
 	_test_music()
@@ -222,6 +223,43 @@ func _test_game_state() -> void:
 	_gs.reset()
 
 
+## O registro e o que permite salvar com mais de uma fase: id estavel que
+## sobrevive a renomear o arquivo, e um caminho padrao para quando a cena
+## salva some.
+func _test_level_registry() -> void:
+	_begin("LevelRegistry")
+
+	_check(LevelRegistry.has(&"level_01"), "level_01 registrado")
+	_check(LevelRegistry.has(&"main_menu"), "main_menu registrado")
+
+	var path := LevelRegistry.path_for(&"level_01")
+	_check(path == "res://scenes/levels/level_01.tscn", "caminho de level_01 (%s)" % path)
+	_check(ResourceLoader.exists(path), "caminho de level_01 existe de verdade")
+
+	_check(
+		LevelRegistry.id_for_path("res://scenes/levels/level_01.tscn") == &"level_01",
+		"id_for_path reverte o caminho"
+	)
+	_check(
+		LevelRegistry.id_for_path("res://scenes/levels/inexistente.tscn") == &"",
+		"id_for_path de cena desconhecida devolve vazio"
+	)
+
+	_check(LevelRegistry.path_for(&"nao_existe") == "", "id desconhecido nao tem caminho")
+
+	# O padrao tem de existir, senao o "Continuar" sem save quebraria.
+	_check(LevelRegistry.default_id() != &"", "ha uma fase padrao definida")
+	_check(ResourceLoader.exists(LevelRegistry.default_path()), "fase padrao existe")
+
+	_check(LevelRegistry.all_ids().size() >= 2, "registro tem as 2 cenas")
+	_check(LevelRegistry.all_paths().size() == LevelRegistry.all_ids().size(), "ids e paths em mesmo numero")
+
+	# Registrar de novo nao pode duplicar nem reordenar.
+	var before: int = LevelRegistry.all_ids().size()
+	LevelRegistry.register(&"level_01", "res://scenes/levels/level_01.tscn")
+	_check_eq(LevelRegistry.all_ids().size(), before, "registrar de novo nao duplica")
+
+
 func _test_save() -> void:
 	_begin("Save")
 
@@ -252,6 +290,65 @@ func _test_save() -> void:
 	_check(not _save.has_save(slot), "arquivo removido")
 
 	_check(not _save.load_game(slot), "load_game falha sem arquivo")
+
+	_test_save_with_missing_level(slot)
+
+
+## Save apontando para uma fase que nao existe mais: o comportamento que
+## importa quando a segunda fase ainda nao foi criada. O Continue tem de cair
+## na fase padrao e avisar, nunca tentar abrir arquivo morto.
+func _test_save_with_missing_level(slot: StringName) -> void:
+	_begin("Save: fase removida")
+
+	var path := "user://saves/%s.json" % slot
+	var payload := {
+		"version": 2,
+		"timestamp": 0,
+		"scene_id": "level_99",
+		"scene_path": "res://scenes/levels/level_99.tscn",
+		"game_state": {"coins": 5, "score": 50, "flags": {}},
+	}
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	_check(file != null, "consegui escrever o save de mentira")
+	if file == null:
+		return
+	file.store_string(JSON.stringify(payload))
+	file.close()
+
+	_check(_save.load_game(slot), "load_game leu o save de fase inexistente")
+	_check(_save.last_scene_missing(), "marcou a cena como ausente")
+	_check_eq(_gs.coins, 5, "restaurou o estado mesmo assim")
+
+	var recovered: String = _save.last_scene_path()
+	_check(recovered != "", "caiu numa cena valida em vez de vazio")
+	_check(
+		ResourceLoader.exists(recovered),
+		"a cena de fallback existe (%s)" % recovered
+	)
+	_check_eq(recovered, LevelRegistry.default_path(), "caiu na fase padrao")
+
+	# Save versao antiga (so tinha path, sem id) tem de continuar funcionando.
+	_begin("Save: versao 1 legada")
+	var legacy := {
+		"version": 1,
+		"timestamp": 0,
+		"scene_path": "res://scenes/levels/level_01.tscn",
+		"game_state": {"coins": 9, "score": 90, "flags": {}},
+	}
+	var legacy_file := FileAccess.open(path, FileAccess.WRITE)
+	_check(legacy_file != null, "consegui escrever o save legado")
+	if legacy_file == null:
+		return
+	legacy_file.store_string(JSON.stringify(legacy))
+	legacy_file.close()
+
+	_check(_save.load_game(slot), "leu save versao 1")
+	_check(not _save.last_scene_missing(), "versao 1 nao e tratada como ausente")
+	_check_eq(_save.last_scene_path(), "res://scenes/levels/level_01.tscn", "resolveu pelo path")
+	_check_eq(_save.last_level_id(), &"level_01", "deduziu o id pelo path")
+	_check_eq(_gs.coins, 9, "restaurou o estado do save legado")
+
+	_save.erase_save(slot)
 
 	_gs.reset()
 

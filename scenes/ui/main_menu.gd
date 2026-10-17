@@ -33,6 +33,7 @@ func _refresh_save_state() -> void:
 	var has_save := Save.has_save()
 	_continue.disabled = not has_save
 	_save_hint.visible = has_save
+	_save_hint.add_theme_color_override("font_color", Color(0.50588, 0.72549, 0.94902))
 	_save_hint.text = "Progresso salvo encontrado" if has_save else ""
 
 
@@ -47,8 +48,17 @@ func _on_continue() -> void:
 	if not Save.load_game():
 		_refresh_save_state()
 		return
-	# Retoma a cena que estava em jogo; cai na fase 1 se o save for antigo.
-	SceneRouter.goto(Save.last_scene_path(), &"level_01")
+
+	# A cena do save pode ter sumido (fase removida, save antigo). O Save ja
+	# cai na fase padrão nesse caso, mas avisamos em vez de fingir que
+	# retomou o progresso.
+	if Save.last_scene_missing():
+		_save_hint.text = "Progresso salvo de uma fase que não existe mais"
+		_save_hint.add_theme_color_override("font_color", Color(0.949, 0.361, 0.361))
+		_save_hint.visible = true
+
+	# Retoma a cena que estava em jogo.
+	SceneRouter.goto(Save.last_scene_path(), Save.last_level_id())
 
 
 func _on_options() -> void:

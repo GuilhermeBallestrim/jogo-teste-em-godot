@@ -8,11 +8,15 @@ signal save_erased(slot: StringName)
 signal save_failed(slot: StringName, reason: String)
 
 const SAVE_DIR := "user://saves"
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 const DEFAULT_SLOT := &"main"
 
 ## Preenchido por [method load_game] com o path da cena salvo.
 var _last_scene_path: String = ""
+## Id da fase carregada, resolvido pelo [LevelRegistry].
+var _last_level_id: StringName = &""
+## True quando a fase salva nao existe mais e caimos na padrao.
+var _last_scene_missing := false
 
 
 func _ready() -> void:
@@ -23,12 +27,21 @@ func _ready() -> void:
 func save_game(slot: StringName = DEFAULT_SLOT) -> bool:
 	var path := _path_for(slot)
 	var current := get_tree().current_scene
+	var scene_path := current.scene_file_path if current != null else ""
+	var level_id := LevelRegistry.id_for_path(scene_path)
+
+	# Sem id resolvido (cena nao registrada), usamos o que o SceneRouter sabe
+	# -- e se nem isso existir, caimos no path para o save nao ficar orfao.
+	if level_id == &"":
+		level_id = SceneRouter.current_scene_id
+
 	var payload := {
 		"version": SAVE_VERSION,
 		"timestamp": Time.get_unix_time_from_system(),
-		# Guardamos o path e o id para o menu saber o que retomar.
-		"scene_path": current.scene_file_path if current != null else "",
-		"scene_id": String(SceneRouter.current_scene_id),
+		# `scene_id` e estavel (sovera renomear o arquivo); `scene_path` e a
+		# rede de seguranca para saves antigos.
+		"scene_id": String(level_id),
+		"scene_path": scene_path,
 		"game_state": GameState.to_dict(),
 	}
 
@@ -67,16 +80,39 @@ func load_game(slot: StringName = DEFAULT_SLOT) -> bool:
 		return false
 
 	var data: Dictionary = parsed
-	if int(data.get("version", 0)) != SAVE_VERSION:
-		save_failed.emit(slot, "Versao de save incompativel (esperada %d)." % SAVE_VERSION)
+	var version := int(data.get("version", 0))
+	# Versao 1 (pre-registro) so tinha `scene_path` e ainda e valido: o id
+	# e deduzido pelo caminho. Acima da atual, o formato mudou demais.
+	if version < 1 or version > SAVE_VERSION:
+		save_failed.emit(slot, "Versao de save incompativel (%d, esperava ate %d)." % [version, SAVE_VERSION])
 		return false
 
 	GameState.from_dict(data.get("game_state", {}))
 
-	# Se a cena salva nao existir mais (fase removida, save antigo), limpa o
-	# caminho para o menu cair no padrao em vez de tentar abrir arquivo morto.
-	var scene_path := String(data.get("scene_path", ""))
-	_last_scene_path = scene_path if ResourceLoader.exists(scene_path) else ""
+	# Resolve a cena por id (estavel) e cai para o path (save antigo) e depois
+	# para a fase padrao. Nunca devolver um caminho morto: o SceneRouter
+	# tentaria abrir e falharia.
+	_last_scene_path = ""
+	_last_level_id = &""
+	_last_scene_missing = false
+
+	var saved_id := StringName(String(data.get("scene_id", "")))
+	var by_id := LevelRegistry.path_for(saved_id) if saved_id != &"" else ""
+
+	if by_id != "" and ResourceLoader.exists(by_id):
+		_last_scene_path = by_id
+		_last_level_id = saved_id
+	else:
+		# Save de antes do registro (so tinha path), ou fase desconhecida.
+		var by_path := String(data.get("scene_path", ""))
+		if by_path != "" and ResourceLoader.exists(by_path):
+			_last_scene_path = by_path
+			_last_level_id = LevelRegistry.id_for_path(by_path)
+		elif saved_id != &"" or by_path != "":
+			# A cena do save nao existe mais.
+			_last_scene_missing = true
+			_last_scene_path = LevelRegistry.default_path()
+			_last_level_id = LevelRegistry.default_id()
 
 	save_loaded.emit(slot)
 	return true
@@ -99,6 +135,18 @@ func erase_save(slot: StringName = DEFAULT_SLOT) -> bool:
 ## Caminho da cena do ultimo save carregado. Vazio se ainda nao houve leitura.
 func last_scene_path() -> String:
 	return _last_scene_path
+
+
+## Id da fase do ultimo save, resolvido pelo [LevelRegistry].
+func last_level_id() -> StringName:
+	return _last_level_id
+
+
+## True quando o save apontava para uma cena que nao existe mais e o menu
+## caiu na fase padrao. A UI usa isso para avisar em vez de fingir que
+## retomou o progresso.
+func last_scene_missing() -> bool:
+	return _last_scene_missing
 
 
 func list_slots() -> PackedStringArray:
