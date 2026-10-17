@@ -31,6 +31,7 @@ func _apply() -> void:
 		Vector2(-half.x, half.y),
 	])
 	_visual.color = body_color
+	GradientPoly.vertical(_visual, top_color.lightened(0.15), body_color.darkened(0.25))
 
 	var edge_thickness := minf(6.0, half.y)
 	_edge.polygon = PackedVector2Array([

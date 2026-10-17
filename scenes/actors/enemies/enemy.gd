@@ -142,6 +142,8 @@ func _ready() -> void:
 		fall_limit = DEFAULT_FALL_LIMIT
 	_hitbox.damage = contact_damage
 	_apply_appearance()
+	# Sombra projetada: um poligono mais escuro, deslocado.
+	GradientPoly.shadow(self, _sprite.polygon, Vector2(4, 6), Color(0, 0, 0, 0.35))
 	_patrol_target_x = patrol_right_x()
 
 
@@ -181,9 +183,22 @@ func _apply_appearance() -> void:
 		Vector2(-half.x, half.y),
 	])
 	_sprite.color = body_color
+	GradientPoly.vertical(_sprite, body_color.lightened(0.2), body_color.darkened(0.35))
 	var rect := RectangleShape2D.new()
 	rect.size = body_size
 	_shape.shape = rect
+
+
+func _process(delta: float) -> void:
+	# Respiracao: o corpo pulsa levemente quando parado. Sem isso o inimigo
+	# parece uma estatua, e a captura de tela nao consegue distinguir "vivo"
+	# de "morto".
+	if state == State.IDLE or state == State.PATROL:
+		var breath := 1.0 + sin(Time.get_ticks_msec() * 0.004) * 0.04
+		_sprite.scale = Vector2(breath, 1.0 / breath)
+	else:
+		if _sprite.scale != Vector2.ONE:
+			_sprite.scale = _sprite.scale.lerp(Vector2.ONE, delta * 8.0)
 
 
 func _physics_process(delta: float) -> void:

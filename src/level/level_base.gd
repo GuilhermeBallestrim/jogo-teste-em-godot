@@ -52,6 +52,7 @@ func _ready() -> void:
 	if reset_state_on_enter:
 		GameState.reset()
 	_apply_camera_limits()
+	_setup_parallax()
 	_coins_at_start = GameState.coins
 	_hud.set_coin_goal(coins_to_win)
 	_check_goal_is_reachable()
@@ -103,6 +104,55 @@ func _check_goal_is_reachable() -> void:
 			"[%s] pede %d pontos de moeda mas a cena so soma %d: a fase e imposible."
 			% [name, coins_to_win, available]
 		)
+
+
+## Parallax de fundo: 3 camadas de montanhas. Sem asset, so Polygon2D.
+func _setup_parallax() -> void:
+	var bg := ParallaxBackground.new()
+	bg.layer = -10
+	add_child(bg)
+	move_child(bg, 0)
+
+	# Camada distante: montanhas baixas, quase estaticas.
+	var far := ParallaxLayer.new()
+	far.motion_scale = Vector2(0.15, 0.05)
+	bg.add_child(far)
+	var far_poly := Polygon2D.new()
+	far_poly.polygon = PackedVector2Array([
+		Vector2(-2000, 200), Vector2(-1400, -120), Vector2(-900, -180),
+		Vector2(-400, -100), Vector2(0, -220), Vector2(500, -140),
+		Vector2(1000, -200), Vector2(1500, -100), Vector2(2000, 200),
+	])
+	far_poly.color = Color(0.08, 0.09, 0.16)
+	GradientPoly.vertical(far_poly, Color(0.12, 0.13, 0.22), Color(0.05, 0.06, 0.1))
+	far.add_child(far_poly)
+
+	# Camada media.
+	var mid := ParallaxLayer.new()
+	mid.motion_scale = Vector2(0.35, 0.12)
+	bg.add_child(mid)
+	var mid_poly := Polygon2D.new()
+	mid_poly.polygon = PackedVector2Array([
+		Vector2(-2000, 260), Vector2(-1200, 80), Vector2(-700, 120),
+		Vector2(-200, 40), Vector2(300, 100), Vector2(800, 60),
+		Vector2(1300, 140), Vector2(2000, 260),
+	])
+	mid_poly.color = Color(0.12, 0.14, 0.22)
+	GradientPoly.vertical(mid_poly, Color(0.16, 0.18, 0.28), Color(0.08, 0.1, 0.16))
+	mid.add_child(mid_poly)
+
+	# Camada proxima: colinas.
+	var near := ParallaxLayer.new()
+	near.motion_scale = Vector2(0.6, 0.25)
+	bg.add_child(near)
+	var near_poly := Polygon2D.new()
+	near_poly.polygon = PackedVector2Array([
+		Vector2(-2000, 320), Vector2(-1000, 200), Vector2(-300, 240),
+		Vector2(400, 180), Vector2(1100, 220), Vector2(2000, 320),
+	])
+	near_poly.color = Color(0.16, 0.18, 0.26)
+	GradientPoly.vertical(near_poly, Color(0.2, 0.22, 0.32), Color(0.1, 0.12, 0.18))
+	near.add_child(near_poly)
 
 
 func _apply_camera_limits() -> void:
