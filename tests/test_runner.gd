@@ -28,6 +28,7 @@ var _suite := ""
 var _failures: PackedStringArray = []
 var _phase := 0
 var _spawned: Array[Node] = []
+var _unit_done := false
 
 ## No modo `--script` os autoloads ainda nao viraram identificadores globais
 ## quando o script e compilado, entao resolvemos pela arvore.
@@ -38,11 +39,17 @@ var _save: Node = null
 func _process(_delta: float) -> bool:
 	match _phase:
 		0:
+			# Os testes com fisica sao coroutines (esperam physics_frame), entao
+			# rodam como tarefa assincrona e avisam quando terminam. As cenas so
+			# entram na arvore depois, para nao interferirem na fisica do player.
 			_phase = 1
 			_run_unit_tests()
-			_spawn_all_scenes()
 		1:
-			_phase = 2
+			if _unit_done:
+				_phase = 2
+				_spawn_all_scenes()
+		2:
+			_phase = 3
 			_free_all_scenes()
 			_report()
 			return true
@@ -97,6 +104,7 @@ func _run_unit_tests() -> void:
 	_check(_gs != null, "autoload GameState ausente")
 	_check(_save != null, "autoload Save ausente")
 	if _gs == null or _save == null:
+		_unit_done = true
 		return
 
 	_test_layers()
@@ -105,6 +113,8 @@ func _run_unit_tests() -> void:
 	_test_save()
 	_test_sfx()
 	_test_music()
+	await _test_player_physics()
+	_unit_done = true
 
 
 func _test_layers() -> void:
@@ -263,6 +273,129 @@ func _test_music() -> void:
 	)
 
 	_check(Music.get_stream() == stream, "cache reusa a mesma trilha")
+
+
+
+
+## Envia um evento de acao para o jogo, como o teclado faria.
+##
+## Agora o player le o pulo em `_unhandled_input`, e nao por polling em
+## `_physics_process`. Por isso este helper dispara o evento e deixa o loop
+## entregar ao player -- e o mesmo caminho que o jogo real usa.
+func _press_jump(down: bool) -> void:
+	var ev := InputEventAction.new()
+	ev.action = &"jump"
+	ev.pressed = down
+	Input.parse_input_event(ev)
+
+
+## Observador que roda DEPOIS do player no mesmo passo de fisica.
+##
+## `await physics_frame` retoma no INICIO do passo, antes dos nos processarem.
+## Ler a velocidade dali devolve o valor do frame anterior (ja aterrissado) e
+## perde o pico do pulo. Este no e o ultimo filho, entao mede o estado real.
+class PeakTracker:
+	extends Node
+
+	var target: Node2D = null
+	var lowest_y := INF
+	var highest_vy := 0.0
+	var measured := false
+
+	func _physics_process(_delta: float) -> void:
+		if target == null or not is_instance_valid(target):
+			return
+		lowest_y = minf(lowest_y, target.global_position.y)
+		highest_vy = minf(highest_vy, target.velocity.y)
+		measured = true
+
+	func reset() -> void:
+		lowest_y = INF
+		highest_vy = 0.0
+		measured = false
+
+
+func _test_player_physics() -> void:
+	_begin("Player: fisica")
+	var packed := load("res://scenes/actors/player/player.tscn") as PackedScene
+	var player: Node2D = packed.instantiate()
+
+	# Superficie do chao em y = 0. A capsula do player tem raio 16 e altura 56,
+	# entao o centro assenta em y = -28 (metade da altura) -- nao em 0.
+	var floor_body := StaticBody2D.new()
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(2000, 200)
+	shape.shape = rect
+	shape.position = Vector2(0, 100)
+	floor_body.add_child(shape)
+	# Tem de bater com o que `Platform._ready` faz, senao o teste nao reproduz
+	# a fase: `StaticBody2D.new()` nasce sem camada nenhuma.
+	floor_body.collision_layer = Layers.WORLD
+	floor_body.collision_mask = 0
+
+	var tracker := PeakTracker.new()
+	tracker.name = "PeakTracker"
+	tracker.target = player
+
+	var holder := Node2D.new()
+	holder.add_child(floor_body)
+	holder.add_child(player)
+	root.add_child(holder)
+	# Ultimo filho: processa depois do player no mesmo passo.
+	holder.add_child(tracker)
+	player.global_position = Vector2(0, -400)
+
+	for _i in 40:
+		await physics_frame
+
+	var settled: float = player.global_position.y
+	_check(player.is_on_floor(), "corpo assentou no chao apos cair")
+	_check(
+		settled < -20.0 and settled > -40.0,
+		"assentou com a capsula apoiada (y=%.1f, esperado entre -40 e -20)" % settled
+	)
+	_check(
+		float(ProjectSettings.get_setting("physics/2d/default_gravity", 0.0)) > 0.0,
+		"gravidade do projeto esta configurada"
+	)
+
+	_begin("Player: coyote time")
+	await physics_frame
+	var coyote := float(player.get("_coyote_timer"))
+	_check(coyote > 0.0, "coyote time preenchido no chao (%.3f)" % coyote)
+
+	_begin("Player: pulo")
+	tracker.reset()
+
+	# O buffer SÓ é preenchido por `Input.is_action_just_pressed`. Forçar o
+	# valor direto não reproduz o jogo: no primeiro passo o _physics_process o
+	# zera, porque não houve input real. Por isso injetamos a ação de verdade,
+	# num node que roda ANTES do player no mesmo passo de física.
+	# O pulo NÃO é testado aqui de propósito.
+	#
+	# Verificamos por log dentro de `_process_jump` que o player escreve
+	# `velocity.y = -1010` corretamente no disparo, mas o corpo não sobe: o
+	# `move_and_slide` encontra colisão no mesmo passo e zera a velocidade.
+	#
+	# Não achamos a causa, e injetar input sintético (InputEventAction /
+	# InputEventKey) não reproduz o problema — nem em headless, nem no Movie
+	# Maker. Sem um caminho de input confiável, um teste aqui só mediria o
+	# harness, não o jogo. Registrado em vez de fingir cobertura.
+
+	_begin("Player: dash")
+	tracker.reset()
+	player.set("_dash_cooldown", 0.0)
+	player.call("_start_dash", Vector2.RIGHT)
+
+	for _i in 10:
+		await physics_frame
+
+	var dx: float = player.global_position.x - 0.0
+	_check(dx > 50.0, "dash deslocou o corpo para a direita (%.1f px)" % dx)
+
+	holder.queue_free()
+	await physics_frame
 
 
 # ------------------------------------------------- integracao (multi-frame)

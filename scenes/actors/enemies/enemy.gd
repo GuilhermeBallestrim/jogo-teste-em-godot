@@ -132,9 +132,15 @@ func _on_landed() -> void:
 	pass
 
 
-## Gravedad. Subclasses sobrescrevem para ter uma locomocao diferente.
+## Gravidade. Subclasses sobrescrevem para ter uma locomocao diferente.
+##
+## `get_gravity()` devolve (0,0) sem "Custom Gravity" ligado em Project
+## Settings > Physics > 2D, entao lemos o valor do projeto como fallback.
 func _apply_vertical(delta: float) -> void:
-	velocity.y += get_gravity().y * GRAVITY_SCALE
+	var g := get_gravity().y
+	if g == 0.0:
+		g = float(ProjectSettings.get_setting("physics/2d/default_gravity", 980.0))
+	velocity.y += g * GRAVITY_SCALE
 
 
 func _tick_hitbox(delta: float) -> void:
